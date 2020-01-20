@@ -111,7 +111,7 @@ namespace MOActionPlugin
             ImGui.Begin("MouseOver action setup", ref isImguiMoSetupOpen,
                 ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoScrollbar);
 
-            ImGui.Text("This window allows you to enable and disable custom combos to your liking.");
+            ImGui.Text("This window allows you to enable and disable actions which will affect your mouse over targets.");
             ImGui.Separator();
 
             ImGui.BeginChild("scrolling", new Vector2(0, 400), true, ImGuiWindowFlags.HorizontalScrollbar);
