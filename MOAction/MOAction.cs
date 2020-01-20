@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Dalamud.Game;
 using Dalamud.Game.ClientState;
@@ -31,6 +33,8 @@ namespace MOActionPlugin
 
         private IntPtr RequestActionAddress;
         private IntPtr UiMOEntityIdAddress;
+
+        public int[] EligibleActionList;
 
         public MOAction(SigScanner scanner, ClientState clientState, MOActionConfiguration configuration)
         {
@@ -73,21 +77,25 @@ namespace MOActionPlugin
         private unsafe ulong HandleRequestAction(long param_1, uint param_2, ulong param_3, long param_4,
                        uint param_5, uint param_6, int param_7)
         {
+            Log.Debug($"RequestAction: {param_3}");
+
+            if (EligibleActionList == null || !EligibleActionList.Contains((int) param_3))
+            {
+                return this.requestActionHook.Original(param_1, param_2, param_3, param_4, param_5, param_6, param_7);
+            }
+
             if (uiMoEntityId != IntPtr.Zero || (int) uiMoEntityId != 0)
             {
                 uint entityId = (uint)Marshal.ReadInt32(uiMoEntityId + 0x74);
                 return requestActionHook.Original(param_1, param_2, param_3, entityId, param_5, param_6, param_7);
             }
+
             if ((uint)Marshal.ReadInt32(mouseoverLocation) != 0xe0000000)
             {
                 return requestActionHook.Original(param_1, param_2, param_3, Marshal.ReadInt32(mouseoverLocation), param_5, param_6, param_7);
             }
-            return this.requestActionHook.Original(param_1, param_2, param_3, param_4, param_5, param_6, param_7);
-        }
 
-        // For future use to filter what abilities the player is allowed to use on mouseover
-        private void PopulateActionTypes()
-        {
+            return this.requestActionHook.Original(param_1, param_2, param_3, param_4, param_5, param_6, param_7);
         }
     }
 }
