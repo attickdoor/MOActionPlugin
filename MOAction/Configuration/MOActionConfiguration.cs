@@ -9,7 +9,7 @@ namespace MOActionPlugin
     [Serializable]
     public class MOActionConfiguration : IPluginConfiguration
     {
-        public MOActionPreset ComboPresets { get; set; }
+        public MOActionPreset MoPresets { get; set; }
         int IPluginConfiguration.Version { get; set; }
     }
 }
