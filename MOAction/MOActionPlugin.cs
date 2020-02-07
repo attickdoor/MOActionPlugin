@@ -173,13 +173,7 @@ namespace MOActionPlugin
                 }
             }
 
-            ImGui.Spacing();
-
-            for (var i = 0; i < orderedByClassJob.Length; i++)
-                if (flagsSelected[i])
-                    Configuration.MoPresets |= orderedByClassJob[i];
-                else
-                    Configuration.MoPresets &= ~orderedByClassJob[i];
+            ImGui.SameLine();
 
             if (ImGui.Button("Save and Close"))
             {
@@ -187,6 +181,14 @@ namespace MOActionPlugin
                 SetNewConfig();
                 isImguiMoSetupOpen = false;
             }
+
+            ImGui.Spacing();
+
+            for (var i = 0; i < orderedByClassJob.Length; i++)
+                if (flagsSelected[i])
+                    Configuration.MoPresets |= orderedByClassJob[i];
+                else
+                    Configuration.MoPresets &= ~orderedByClassJob[i];
 
             ImGui.End();
         }
