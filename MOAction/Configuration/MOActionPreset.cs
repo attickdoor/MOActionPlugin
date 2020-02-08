@@ -35,7 +35,22 @@ namespace MOActionPlugin
         AstrologianSynastry = 1 << 11,
         [MoActionInfo(3606, "Ascend", false, 33)]
         AstrologianAscend = 1 << 12,
-
+        [MoActionInfo(4404, "Bole", false, 33)]
+        AstrologianBole = 1 << 22,
+        [MoActionInfo(4401, "Balance", false, 33)]
+        AstrologianBalance = 1 << 23,
+        [MoActionInfo(4403, "Spear", false, 33)]
+        AstrologianSpear = 1 << 24,
+        [MoActionInfo(4402, "Arrow", false, 33)]
+        AstrologianArrow = 1 << 25,
+        [MoActionInfo(4405, "Spire", false, 33)]
+        AstrologianSpire = 1 << 26,
+        [MoActionInfo(4406, "Ewer", false, 33)]
+        AstrologianEwer = 1 << 27,
+        [MoActionInfo(7444, "Lord", false, 33)]
+        AstrologianLord = 1 << 28,
+        [MoActionInfo(7445, "Lady", false, 33)]
+        AstrologianLady = 1 << 29,
         // WHITE MAGE
         [MoActionInfo(120, "Cure", false, 24)]
         WhiteMageCure = 1 << 13,
