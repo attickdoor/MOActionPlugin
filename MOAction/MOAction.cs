@@ -34,7 +34,10 @@ namespace MOActionPlugin
         private IntPtr RequestActionAddress;
         private IntPtr UiMOEntityIdAddress;
 
-        public int[] EligibleActionList;
+        private HashSet<ulong> enabledActions;
+
+        public bool IsGuiMOEnabled = false;
+        public bool IsFieldMOEnabled = false;
 
         public MOAction(SigScanner scanner, ClientState clientState, MOActionConfiguration configuration)
         {
@@ -54,6 +57,19 @@ namespace MOActionPlugin
 
             requestActionHook = new Hook<OnRequestActionDetour>(Address.RequestAction, new OnRequestActionDetour(HandleRequestAction), this);
             uiMoEntityIdHook = new Hook<OnSetUiMouseoverEntityId>(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId), this);
+
+            enabledActions = new HashSet<ulong>();
+        }
+
+        public void enableAction(ulong ActionID)
+        {
+            if (enabledActions.Contains(ActionID)) return;
+            enabledActions.Add(ActionID);
+        }
+
+        public void removeAction(ulong ActionID)
+        {
+            if (enabledActions.Contains(ActionID)) enabledActions.Remove(ActionID);
         }
 
         public void Enable()
@@ -79,18 +95,18 @@ namespace MOActionPlugin
         {
             Log.Debug($"RequestAction: {param_3}");
 
-            if (EligibleActionList == null || !EligibleActionList.Contains((int) param_3))
+            if (enabledActions.Count() == 0 || !enabledActions.Contains(param_3))
             {
                 return this.requestActionHook.Original(param_1, param_2, param_3, param_4, param_5, param_6, param_7);
             }
 
-            if (uiMoEntityId != IntPtr.Zero || (int) uiMoEntityId != 0)
+            if (IsGuiMOEnabled && (uiMoEntityId != IntPtr.Zero || (int) uiMoEntityId != 0))
             {
                 uint entityId = (uint)Marshal.ReadInt32(uiMoEntityId + 0x74);
                 return requestActionHook.Original(param_1, param_2, param_3, entityId, param_5, param_6, param_7);
             }
 
-            if ((uint)Marshal.ReadInt32(mouseoverLocation) != 0xe0000000)
+            if (IsFieldMOEnabled && ((uint)Marshal.ReadInt32(mouseoverLocation) != 0xe0000000))
             {
                 return requestActionHook.Original(param_1, param_2, param_3, Marshal.ReadInt32(mouseoverLocation), param_5, param_6, param_7);
             }

@@ -86,6 +86,9 @@ namespace MOActionPlugin
         ScholarExcogitationPvP = 1 << 13,
         [MoActionInfo(173, "Resurrection", false, 24)]
         ScholarResurrection = 1 << 13,
+
+        EnableGuiMouseover = 1 << 22,
+        EnableFieldMouseover = 1 << 23
     }
 
     public class MoActionInfoAttribute : Attribute

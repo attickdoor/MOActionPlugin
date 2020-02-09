@@ -55,9 +55,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Configuration\ApplicableAction.cs" />
     <Compile Include="Configuration\MOActionConfiguration.cs" />
     <Compile Include="Configuration\MOActionPreset.cs" />
-    <Compile Include="Configuration\AbilityList.cs" />
     <Compile Include="MOAction.cs" />
     <Compile Include="MOActionAddressResolver.cs" />
     <Compile Include="MOActionPlugin.cs" />
