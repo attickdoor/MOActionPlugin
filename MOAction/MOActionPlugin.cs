@@ -103,7 +103,7 @@ namespace MOActionPlugin
                         if (!lastClassJob.Equals(ClassJobCategoryToName(action.ClassJobCategory)))
                         {
                             lastClassJob = ClassJobCategoryToName(action.ClassJobCategory);
-                            if (ImGui.CollapsingHeader(lastClassJob + " Support"))
+                            if (ImGui.CollapsingHeader(lastClassJob + "##Support"))
                             {
                                 for (int j = i; j < applicableActions.Count(); j++)
                                 {
@@ -139,7 +139,7 @@ namespace MOActionPlugin
                         if (!lastClassJob.Equals(ClassJobCategoryToName(action.ClassJobCategory)))
                         {
                             lastClassJob = ClassJobCategoryToName(action.ClassJobCategory);
-                            if (ImGui.CollapsingHeader(lastClassJob + " Damage"))
+                            if (ImGui.CollapsingHeader(lastClassJob + "##Damage"))
                             {
                                 for (int j = i; j < applicableActions.Count(); j++)
                                 {
@@ -205,7 +205,7 @@ namespace MOActionPlugin
                         if (!lastClassJob.Equals(ClassJobCategoryToName(action.ClassJobCategory)))
                         {
                             lastClassJob = ClassJobCategoryToName(action.ClassJobCategory);
-                            if (ImGui.CollapsingHeader(lastClassJob + " PVP Support"))
+                            if (ImGui.CollapsingHeader(lastClassJob + "##PVP Support"))
                             {
                                 for (int j = i; j < applicableActions.Count(); j++)
                                 {
@@ -238,7 +238,7 @@ namespace MOActionPlugin
                         if (!lastClassJob.Equals(ClassJobCategoryToName(action.ClassJobCategory)))
                         {
                             lastClassJob = ClassJobCategoryToName(action.ClassJobCategory);
-                            if (ImGui.CollapsingHeader(lastClassJob + " PVP Damage"))
+                            if (ImGui.CollapsingHeader(lastClassJob + "##PVP Damage"))
                             {
 
                                 for (int j = i; j < applicableActions.Count(); j++)
@@ -311,13 +311,13 @@ namespace MOActionPlugin
         {
             for (int i = 0; i < applicableActions.Count(); i++)
             {
-                if (flags[i])
+                if (flags[i] == true)
                 {
                     moAction.enableAction(applicableActions.ElementAt(i).ID);
                 }
                 else
                 {
-                    moAction.enableAction(applicableActions.ElementAt(i).ID);
+                    moAction.removeAction(applicableActions.ElementAt(i).ID);
                 }
             }
         }
