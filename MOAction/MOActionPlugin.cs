@@ -1021,15 +1021,17 @@ namespace MOActionPlugin
             applicableActions.Add(new ApplicableAction(18992, "Smite", false, false, false, false, true, 122, true));
             applicableActions.Add(new ApplicableAction(19071, "Nature's Minne", false, true, true, false, false, 24, true));
             applicableActions.Add(new ApplicableAction(19085, "Intervention", false, false, true, false, false, 20, true));
-            applicableActions.Add(new ApplicableAction(4401, "The Balance", false, true, true, false, false, 99, false));
+           /* applicableActions.Add(new ApplicableAction(4401, "The Balance", false, true, true, false, false, 99, false));
             applicableActions.Add(new ApplicableAction(4402, "The Arrow", false, true, true, false, false, 99, false));
             applicableActions.Add(new ApplicableAction(4403, "The Spear", false, true, true, false, false, 99, false));
             applicableActions.Add(new ApplicableAction(4404, "The Bole", false, true, true, false, false, 99, false));
             applicableActions.Add(new ApplicableAction(4405, "The Ewer", false, true, true, false, false, 99, false));
             applicableActions.Add(new ApplicableAction(4406, "The Spire", false, true, true, false, false, 99, false));
             applicableActions.Add(new ApplicableAction(7444, "Lord of Crowns", false, true, true, false, false, 99, false));
-            applicableActions.Add(new ApplicableAction(7445, "Lady of Crowns", false, true, true, false, false, 99, false));
+            applicableActions.Add(new ApplicableAction(7445, "Lady of Crowns", false, true, true, false, false, 99, false));*/
             applicableActions.Add(new ApplicableAction(7438, "Fey Union", false, true, true, false, false, 29, false));
+            applicableActions.Add(new ApplicableAction(17055, "Play", false, true, true, false, false, 99, false));
+            applicableActions.Add(new ApplicableAction(7443, "Minor Arcana", false, true, true, false, false, 99, false));
             SortActions();
         }
     }
