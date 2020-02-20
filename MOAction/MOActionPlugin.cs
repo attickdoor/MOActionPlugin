@@ -28,17 +28,15 @@ namespace MOActionPlugin
         private string[] roleActionNames = { /*"Disciple of Magic", "Disciple of War",*/ "Caster", "Ranged",  "Melee", "Tank", "Healer"};
 
         private bool[] flagsSelected;
-
-
-
+        private bool isImguiMoSetupOpen = false;
 
         public void Initialize(DalamudPluginInterface pluginInterface)
         {
             this.pluginInterface = pluginInterface;
 
-            this.pluginInterface.CommandManager.AddHandler("/pmoaction", new CommandInfo(OnCommandDebugCombo)
+            this.pluginInterface.CommandManager.AddHandler("/pmoaction", new CommandInfo(OnCommandDebugMouseover)
             {
-                HelpMessage = "Open a window to edit custom combo settings.",
+                HelpMessage = "Open a window to edit mouseover action settings.",
                 ShowInHelp = true
             });
 
@@ -59,8 +57,6 @@ namespace MOActionPlugin
             for (var i = 0; i < flagsSelected.Length; i++)
                 flagsSelected[i] = false;
         }
-
-        private bool isImguiMoSetupOpen = true;
 
         private void UiBuilder_OnBuildUi()
         {
@@ -313,11 +309,11 @@ namespace MOActionPlugin
             {
                 if (flags[i] == true)
                 {
-                    moAction.enableAction(applicableActions.ElementAt(i).ID);
+                    moAction.EnableAction(applicableActions.ElementAt(i).ID);
                 }
                 else
                 {
-                    moAction.removeAction(applicableActions.ElementAt(i).ID);
+                    moAction.RemoveAction(applicableActions.ElementAt(i).ID);
                 }
             }
         }
@@ -343,7 +339,7 @@ namespace MOActionPlugin
             pluginInterface.Dispose();
         }
 
-        private void OnCommandDebugCombo(string command, string arguments)
+        private void OnCommandDebugMouseover(string command, string arguments)
         {
             isImguiMoSetupOpen = true;
         }
@@ -671,7 +667,7 @@ namespace MOActionPlugin
             applicableActions.Add(new ApplicableAction(3623, "Syphon Strike", false, false, false, false, true, 98, false));
             applicableActions.Add(new ApplicableAction(3624, "Unmend", false, false, false, false, true, 98, false));
             applicableActions.Add(new ApplicableAction(3632, "Souleater", false, false, false, false, true, 98, false));
-            applicableActions.Add(new ApplicableAction(3639, "Salted Earth", false, false, false, false, false, 98, false));
+            applicableActions.Add(new ApplicableAction(3639, "Salted Earth", false, false, false, false, true, 98, false));
             applicableActions.Add(new ApplicableAction(3640, "Plunge", false, false, false, false, true, 98, false));
             applicableActions.Add(new ApplicableAction(3641, "Abyssal Drain", false, false, false, false, true, 98, false));
             applicableActions.Add(new ApplicableAction(3643, "Carve and Spit", false, false, false, false, true, 98, false));
@@ -1021,14 +1017,6 @@ namespace MOActionPlugin
             applicableActions.Add(new ApplicableAction(18992, "Smite", false, false, false, false, true, 122, true));
             applicableActions.Add(new ApplicableAction(19071, "Nature's Minne", false, true, true, false, false, 24, true));
             applicableActions.Add(new ApplicableAction(19085, "Intervention", false, false, true, false, false, 20, true));
-           /* applicableActions.Add(new ApplicableAction(4401, "The Balance", false, true, true, false, false, 99, false));
-            applicableActions.Add(new ApplicableAction(4402, "The Arrow", false, true, true, false, false, 99, false));
-            applicableActions.Add(new ApplicableAction(4403, "The Spear", false, true, true, false, false, 99, false));
-            applicableActions.Add(new ApplicableAction(4404, "The Bole", false, true, true, false, false, 99, false));
-            applicableActions.Add(new ApplicableAction(4405, "The Ewer", false, true, true, false, false, 99, false));
-            applicableActions.Add(new ApplicableAction(4406, "The Spire", false, true, true, false, false, 99, false));
-            applicableActions.Add(new ApplicableAction(7444, "Lord of Crowns", false, true, true, false, false, 99, false));
-            applicableActions.Add(new ApplicableAction(7445, "Lady of Crowns", false, true, true, false, false, 99, false));*/
             applicableActions.Add(new ApplicableAction(7438, "Fey Union", false, true, true, false, false, 29, false));
             applicableActions.Add(new ApplicableAction(17055, "Play", false, true, true, false, false, 99, false));
             applicableActions.Add(new ApplicableAction(7443, "Minor Arcana", false, true, true, false, false, 99, false));

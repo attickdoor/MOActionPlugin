@@ -11,6 +11,7 @@ namespace MOActionPlugin
 
         public IntPtr SetUiMouseoverEntityId { get; private set; }
 
+        // This is so hacky. One day I'm going to figure out how to get proper sigs.
         protected override void Setup64Bit(SigScanner sig)
         {
             this.RequestAction = sig.ScanText("40 53 55 57 41 54 41 57 48 83 EC 60 83 BC 24 ?? ?? ?? ?? ?? 49 8B E9 45 8B E0 44 8B FA 48 8B F9 41 8B D8 74 14 80 79 68 00 74 0E 32 C0 48 83 C4 60 41 5F 41 5C 5F 5D 5B C3");

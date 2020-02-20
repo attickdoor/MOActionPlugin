@@ -27,7 +27,7 @@ namespace MOActionPlugin
         private Hook<OnRequestActionDetour> requestActionHook;
         private Hook<OnSetUiMouseoverEntityId> uiMoEntityIdHook;
 
-        private IntPtr mouseoverLocation;
+        private IntPtr fieldMOLocation;
 
         IntPtr uiMoEntityId = IntPtr.Zero;
 
@@ -47,7 +47,7 @@ namespace MOActionPlugin
             Address.Setup(scanner);
 
             byteBase = scanner.Module.BaseAddress;
-            this.mouseoverLocation = byteBase + 0x1C2AA20;
+            this.fieldMOLocation = byteBase + 0x1C8E660;
             RequestActionAddress = byteBase + 0x6cbd40;
             UiMOEntityIdAddress = byteBase + 0x623100;
 
@@ -61,13 +61,13 @@ namespace MOActionPlugin
             enabledActions = new HashSet<ulong>();
         }
 
-        public void enableAction(ulong ActionID)
+        public void EnableAction(ulong ActionID)
         {
             if (enabledActions.Contains(ActionID)) return;
             enabledActions.Add(ActionID);
         }
 
-        public void removeAction(ulong ActionID)
+        public void RemoveAction(ulong ActionID)
         {
             if (enabledActions.Contains(ActionID)) enabledActions.Remove(ActionID);
         }
@@ -93,7 +93,7 @@ namespace MOActionPlugin
         private unsafe ulong HandleRequestAction(long param_1, uint param_2, ulong param_3, long param_4,
                        uint param_5, uint param_6, int param_7)
         {
-            Log.Debug($"RequestAction: {param_3}");
+            Log.Verbose($"RequestAction: {param_3} {param_4}");
 
             if (enabledActions.Count() == 0 || !enabledActions.Contains(param_3))
             {
@@ -106,9 +106,9 @@ namespace MOActionPlugin
                 return requestActionHook.Original(param_1, param_2, param_3, entityId, param_5, param_6, param_7);
             }
 
-            if (IsFieldMOEnabled && ((uint)Marshal.ReadInt32(mouseoverLocation) != 0xe0000000))
+            if (IsFieldMOEnabled && ((uint)Marshal.ReadInt32(fieldMOLocation) != 0xe0000000))
             {
-                return requestActionHook.Original(param_1, param_2, param_3, Marshal.ReadInt32(mouseoverLocation), param_5, param_6, param_7);
+                return requestActionHook.Original(param_1, param_2, param_3, Marshal.ReadInt32(fieldMOLocation), param_5, param_6, param_7);
             }
 
             return this.requestActionHook.Original(param_1, param_2, param_3, param_4, param_5, param_6, param_7);

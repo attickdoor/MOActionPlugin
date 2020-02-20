@@ -5,12 +5,12 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("IconReplacerPlugin")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyTitle("MOActionPlugin")]
+[assembly: AssemblyDescription("This plugin allows for actions to be used on mouseover targets without a macro.")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("IconReplacerPlugin")]
-[assembly: AssemblyCopyright("Copyright ©  2019")]
+[assembly: AssemblyProduct("MOActionPlugin")]
+[assembly: AssemblyCopyright("Copyleft attick 2020 baybeeee")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
