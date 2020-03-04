@@ -40,22 +40,23 @@ namespace MOActionPlugin
                 ShowInHelp = true
             });
 
-            Configuration = pluginInterface.GetPluginConfig() as MOActionConfiguration ?? new MOActionConfiguration();
-
-            moAction = new MOAction(pluginInterface.TargetModuleScanner, pluginInterface.ClientState, Configuration);
-
-            SetNewConfig();
-
-            moAction.Enable();
-
-            this.pluginInterface.UiBuilder.OnBuildUi += UiBuilder_OnBuildUi;
-
             this.applicableActions = new List<ApplicableAction>();
 
             PopulateActions();
             flagsSelected = new bool[applicableActions.Count()];
             for (var i = 0; i < flagsSelected.Length; i++)
                 flagsSelected[i] = false;
+
+            Configuration = pluginInterface.GetPluginConfig() as MOActionConfiguration ?? new MOActionConfiguration();
+
+            moAction = new MOAction(pluginInterface.TargetModuleScanner, pluginInterface.ClientState, Configuration);
+
+            moAction.Enable();
+            SetNewConfig();
+
+            this.pluginInterface.UiBuilder.OnBuildUi += UiBuilder_OnBuildUi;
+
+           
         }
 
         private void UiBuilder_OnBuildUi()
@@ -286,8 +287,10 @@ namespace MOActionPlugin
 
             if (ImGui.Button("Save and Close"))
             {
-                pluginInterface.SavePluginConfig(Configuration);
                 UpdateList(flagsSelected);
+                UpdateConfig();
+                pluginInterface.SavePluginConfig(Configuration);
+                
                 SetNewConfig();
                 isImguiMoSetupOpen = false;
             }
@@ -301,6 +304,13 @@ namespace MOActionPlugin
                     Configuration.MoPresets &= ~orderedByClassJob[i];
             */
             ImGui.End();
+        }
+
+        private void UpdateConfig()
+        {
+            Configuration.IsFieldMO = moAction.IsFieldMOEnabled;
+            Configuration.IsGuiMO = moAction.IsGuiMOEnabled;
+            Configuration.ActiveIDs = moAction.enabledActions;
         }
 
         private void UpdateList(bool[] flags)
@@ -320,14 +330,28 @@ namespace MOActionPlugin
 
         private void SetNewConfig()
         {
+            moAction.IsGuiMOEnabled = Configuration.IsGuiMO;
+            moAction.IsFieldMOEnabled = Configuration.IsFieldMO;
+            foreach (ulong l in Configuration.ActiveIDs)
+            {
+                moAction.EnableAction(l);
+                for (int i = 0; i < flagsSelected.Length; i++)
+                {
+                    if (applicableActions.ElementAt(i).ID == l)
+                        flagsSelected[i] = true;
+                }
+            }
+            
+            /*
             var values = Enum.GetValues(typeof(MOActionPreset)).Cast<MOActionPreset>();
             var orderedByClassJob = values
                 .Where(x => x != MOActionPreset.None && x.GetAttribute<MoActionInfoAttribute>() != null)
                 .OrderBy(x => x.GetAttribute<MoActionInfoAttribute>().ClassJob).ToArray();
 
-            var eligibleActionList = (from t in orderedByClassJob where Configuration.MoPresets.HasFlag(t) select t.GetAttribute<MoActionInfoAttribute>().ActionId).ToArray();
+            //var eligibleActionList = (from t in orderedByClassJob where Configuration.MoPresets.HasFlag(t) select t.GetAttribute<MoActionInfoAttribute>().ActionId).ToArray();
 
             //this.moAction.enabledActions = eligibleActionList;
+            */
         }
 
         public void Dispose()

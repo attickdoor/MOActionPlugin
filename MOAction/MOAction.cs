@@ -34,7 +34,7 @@ namespace MOActionPlugin
         private IntPtr RequestActionAddress;
         private IntPtr UiMOEntityIdAddress;
 
-        private HashSet<ulong> enabledActions;
+        public HashSet<ulong> enabledActions { get; private set; }
 
         public bool IsGuiMOEnabled = false;
         public bool IsFieldMOEnabled = false;
