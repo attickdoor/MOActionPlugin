@@ -25,7 +25,7 @@ namespace MOActionPlugin
         private List<ApplicableAction> applicableActions;
 
         private string[] soloJobNames = { "AST", "WHM", "SCH", "SMN", "ACN", "BLM", "RDM", "BLU", "BRD", "MCH", "DNC", "DRK", "GNB", "WAR", "PLD", "DRG", "MNK", "SAM", "NIN" };
-        private string[] roleActionNames = { /*"Disciple of Magic", "Disciple of War",*/ "Caster", "Ranged",  "Melee", "Tank", "Healer"};
+        private string[] roleActionNames = { "Caster", "Ranged",  "Melee", "Tank", "Healer"};
 
         private bool[] flagsSelected;
         private bool isImguiMoSetupOpen = false;
@@ -63,12 +63,6 @@ namespace MOActionPlugin
         {
             if (!isImguiMoSetupOpen)
                 return;
-            /*
-            var values = Enum.GetValues(typeof(MOActionPreset)).Cast<MOActionPreset>();
-            var orderedByClassJob = values
-                .Where(x => x != MOActionPreset.None && x.GetAttribute<MoActionInfoAttribute>() != null)
-                .OrderBy(x => x.GetAttribute<MoActionInfoAttribute>().ClassJob).ToArray();
-            */
 
             ImGui.SetNextWindowSize(new Vector2(740, 490));
 
@@ -296,13 +290,6 @@ namespace MOActionPlugin
             }
 
             ImGui.Spacing();
-            /*
-            for (var i = 0; i < orderedByClassJob.Length; i++)
-                if (flagsSelected[i])
-                    Configuration.MoPresets |= orderedByClassJob[i];
-                else
-                    Configuration.MoPresets &= ~orderedByClassJob[i];
-            */
             ImGui.End();
         }
 
@@ -335,23 +322,14 @@ namespace MOActionPlugin
             foreach (ulong l in Configuration.ActiveIDs)
             {
                 moAction.EnableAction(l);
+                // I am not a smart programmer.
+                // This will be much better once I figure out how to work with Lumina.
                 for (int i = 0; i < flagsSelected.Length; i++)
                 {
                     if (applicableActions.ElementAt(i).ID == l)
                         flagsSelected[i] = true;
                 }
             }
-            
-            /*
-            var values = Enum.GetValues(typeof(MOActionPreset)).Cast<MOActionPreset>();
-            var orderedByClassJob = values
-                .Where(x => x != MOActionPreset.None && x.GetAttribute<MoActionInfoAttribute>() != null)
-                .OrderBy(x => x.GetAttribute<MoActionInfoAttribute>().ClassJob).ToArray();
-
-            //var eligibleActionList = (from t in orderedByClassJob where Configuration.MoPresets.HasFlag(t) select t.GetAttribute<MoActionInfoAttribute>().ActionId).ToArray();
-
-            //this.moAction.enabledActions = eligibleActionList;
-            */
         }
 
         public void Dispose()
