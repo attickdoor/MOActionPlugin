@@ -55,8 +55,6 @@ namespace MOActionPlugin
             SetNewConfig();
 
             this.pluginInterface.UiBuilder.OnBuildUi += UiBuilder_OnBuildUi;
-
-           
         }
 
         private void UiBuilder_OnBuildUi()

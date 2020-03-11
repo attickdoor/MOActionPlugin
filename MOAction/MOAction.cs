@@ -47,7 +47,7 @@ namespace MOActionPlugin
             Address.Setup(scanner);
 
             byteBase = scanner.Module.BaseAddress;
-            this.fieldMOLocation = byteBase + 0x1C8E660;
+            this.fieldMOLocation = byteBase + 0x1C8E5E0;
             RequestActionAddress = byteBase + 0x6cbd40;
             UiMOEntityIdAddress = byteBase + 0x623100;
 
