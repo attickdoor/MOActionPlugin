@@ -31,9 +31,6 @@ namespace MOActionPlugin
 
         IntPtr uiMoEntityId = IntPtr.Zero;
 
-        private IntPtr RequestActionAddress;
-        private IntPtr UiMOEntityIdAddress;
-
         public HashSet<ulong> enabledActions { get; private set; }
 
         public bool IsGuiMOEnabled = false;
@@ -47,7 +44,6 @@ namespace MOActionPlugin
             Address.Setup(scanner);
 
             byteBase = scanner.Module.BaseAddress;
-            //this.fieldMOLocation = byteBase + 0x1C8E5E0;
             fieldMOLocation = scanner.GetStaticAddressFromSig("E8 ?? ?? ?? ?? 83 BF ?? ?? ?? ?? ?? 0F 84 ?? ?? ?? ?? 48 8D 4C 24 ??", 0x28E);
 
             Log.Verbose("===== M O A C T I O N =====");
