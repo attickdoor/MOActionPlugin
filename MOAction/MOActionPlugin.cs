@@ -54,7 +54,7 @@ namespace MOActionPlugin
             moAction.Enable();
             SetNewConfig();
 
-            this.pluginInterface.UiBuilder.OnBuildUi += UiBuilder_OnBuildUi;
+            this.pluginInterface.UiBuilder.OnOpenConfigUi += (sender, args) => isImguiMoSetupOpen = true;
         }
 
         private void UiBuilder_OnBuildUi()
