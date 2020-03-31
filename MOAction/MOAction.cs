@@ -5,11 +5,15 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Dalamud.Game;
 using Dalamud.Game.ClientState;
+using Dalamud.Game.ClientState.Actors.Types;
+using Dalamud.Game.ClientState.Actors.Types.NonPlayer;
 using Dalamud.Game.ClientState.Structs.JobGauge;
 using Dalamud.Hooking;
+using Dalamud.Plugin;
+using MOAction.Target;
 using Serilog;
 
-namespace MOActionPlugin
+namespace MOAction
 {
     public class MOAction
     {
@@ -18,8 +22,6 @@ namespace MOActionPlugin
 
         public delegate void OnSetUiMouseoverEntityId(long param1, long param2);
 
-        private readonly IntPtr byteBase;
-
         private readonly MOActionAddressResolver Address;
 
         private readonly MOActionConfiguration Configuration;
@@ -27,24 +29,35 @@ namespace MOActionPlugin
         private Hook<OnRequestActionDetour> requestActionHook;
         private Hook<OnSetUiMouseoverEntityId> uiMoEntityIdHook;
 
-        private IntPtr fieldMOLocation;
+        public Dictionary<uint, List<(uint actionid, TargetType targ)>> Stacks { get; set; }
+        private DalamudPluginInterface pluginInterface;
+        private IEnumerable<Lumina.Excel.GeneratedSheets.Action> RawActions;
 
-        IntPtr uiMoEntityId = IntPtr.Zero;
+        public IntPtr fieldMOLocation;
+        public IntPtr focusTargLocation;
+        public IntPtr regularTargLocation;
+        public IntPtr uiMoEntityId = IntPtr.Zero;
 
-        public HashSet<ulong> enabledActions { get; private set; }
+        public HashSet<ulong> enabledActions;
 
         public bool IsGuiMOEnabled = false;
         public bool IsFieldMOEnabled = false;
 
-        public MOAction(SigScanner scanner, ClientState clientState, MOActionConfiguration configuration)
+        public MOAction(SigScanner scanner, ClientState clientState, MOActionConfiguration configuration, ref DalamudPluginInterface plugin, IEnumerable<Lumina.Excel.GeneratedSheets.Action> rawActions)
         {
+            fieldMOLocation = scanner.GetStaticAddressFromSig("E8 ?? ?? ?? ?? 83 BF ?? ?? ?? ?? ?? 0F 84 ?? ?? ?? ?? 48 8D 4C 24 ??", 0x28E);
+            focusTargLocation = scanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 48 89 5C 24 ?? BB ?? ?? ?? ?? 48 89 7C 24 ??", 0);
+            regularTargLocation = scanner.GetStaticAddressFromSig("F3 0F 11 05 ?? ?? ?? ?? EB 27", 0) + 0x4;
+
             Configuration = configuration;
 
             Address = new MOActionAddressResolver();
             Address.Setup(scanner);
 
-            byteBase = scanner.Module.BaseAddress;
-            fieldMOLocation = scanner.GetStaticAddressFromSig("E8 ?? ?? ?? ?? 83 BF ?? ?? ?? ?? ?? 0F 84 ?? ?? ?? ?? 48 8D 4C 24 ??", 0x28E);
+            pluginInterface = plugin;
+            RawActions = rawActions;
+
+            Stacks = new Dictionary<uint, List<(uint actionid, TargetType targ)>>();
 
             Log.Verbose("===== M O A C T I O N =====");
             Log.Verbose("RequestAction address {IsIconReplaceable}", Address.RequestAction);
@@ -56,15 +69,15 @@ namespace MOActionPlugin
             enabledActions = new HashSet<ulong>();
         }
 
-        public void EnableAction(ulong ActionID)
+        public void EnableAction(uint ActionID, List<(uint actionid, TargetType targ)> stack)
         {
-            if (enabledActions.Contains(ActionID)) return;
-            enabledActions.Add(ActionID);
+            if (Stacks.ContainsKey(ActionID)) Stacks[ActionID] = stack;
+            Stacks.Add(ActionID, stack);
         }
 
-        public void RemoveAction(ulong ActionID)
+        public void RemoveAction(uint ActionID)
         {
-            if (enabledActions.Contains(ActionID)) enabledActions.Remove(ActionID);
+            if (Stacks.ContainsKey(ActionID)) Stacks.Remove(ActionID);
         }
 
         public void Enable()
@@ -89,24 +102,62 @@ namespace MOActionPlugin
                        uint param_5, uint param_6, int param_7)
         {
             Log.Verbose($"RequestAction: {param_3} {param_4}");
-
-            if (enabledActions.Count() == 0 || !enabledActions.Contains(param_3))
-            {
-                return this.requestActionHook.Original(param_1, param_2, param_3, param_4, param_5, param_6, param_7);
-            }
-
-            if (IsGuiMOEnabled && (uiMoEntityId != IntPtr.Zero || (int) uiMoEntityId != 0))
-            {
-                uint entityId = (uint)Marshal.ReadInt32(uiMoEntityId + 0x74);
-                return requestActionHook.Original(param_1, param_2, param_3, entityId, param_5, param_6, param_7);
-            }
-
-            if (IsFieldMOEnabled && ((uint)Marshal.ReadInt32(fieldMOLocation) != 0xe0000000))
-            {
-                return requestActionHook.Original(param_1, param_2, param_3, Marshal.ReadInt32(fieldMOLocation), param_5, param_6, param_7);
-            }
-
+            var (action, target) = GetActionTarget((uint)param_3);
+            if (action != 0 && target != 0)
+                return this.requestActionHook.Original(param_1, param_2, action, target, param_5, param_6, param_7);
             return this.requestActionHook.Original(param_1, param_2, param_3, param_4, param_5, param_6, param_7);
         }
+
+        private (uint action, uint target) GetActionTarget(uint ActionID)
+        {
+            if (Stacks.ContainsKey(ActionID))
+            {
+                List<(uint actionid, TargetType targ)> stack = Stacks[ActionID];
+                foreach ((uint actionid, TargetType targ) t in stack)
+                {
+                    if (CanUseAction(t)) return (t.actionid, t.targ.GetTargetActorId());
+                }
+            }
+            return (0, 0);
+        }
+
+        private bool CanUseAction((ulong actionid, TargetType targ) targ)
+        {
+            var action = RawActions.Single(row => (ulong)row.RowId == targ.actionid);
+
+            for (var i = 0; i < this.pluginInterface.ClientState.Actors.Length; i++)
+            {
+                var a = this.pluginInterface.ClientState.Actors[i];
+                if (a.ActorId == targ.targ.GetTargetActorId())
+                {
+                    if (a is PlayerCharacter) return action.CanTargetFriendly;
+                    if (a is BattleNpc)
+                    {
+                        BattleNpc b = (BattleNpc)a;
+                        if (b.BattleNpcKind != BattleNpcSubKind.Enemy) return action.CanTargetFriendly;
+                    }
+                    return action.CanTargetHostile;
+                }
+            }
+            return false;
+        }
+
+        public IntPtr GetGuiMoPtr()
+        {
+            return uiMoEntityId;
+        }
+        public IntPtr GetFieldMoPtr()
+        {
+            return fieldMOLocation;
+        }
+        public IntPtr GetFocusPtr()
+        {
+            return Marshal.ReadIntPtr(focusTargLocation);
+        }
+        public IntPtr GetRegTargPtr()
+        {
+            return regularTargLocation;
+        }
+
     }
 }

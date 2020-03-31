@@ -5,7 +5,7 @@ using Dalamud.Configuration;
 using Dalamud.Plugin;
 using Newtonsoft.Json;
 
-namespace MOActionPlugin
+namespace MOAction
 {
     [Serializable]
     public class MOActionConfiguration : IPluginConfiguration

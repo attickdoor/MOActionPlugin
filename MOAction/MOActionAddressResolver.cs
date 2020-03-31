@@ -2,7 +2,7 @@
 using Dalamud.Game.Internal;
 using System;
 
-namespace MOActionPlugin
+namespace MOAction
 {
     class MOActionAddressResolver : BaseAddressResolver
     {

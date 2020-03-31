@@ -55,13 +55,16 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="GuiSettings.cs" />
     <Compile Include="Configuration\ApplicableAction.cs" />
     <Compile Include="Configuration\MOActionConfiguration.cs" />
-    <Compile Include="Configuration\MOActionPreset.cs" />
     <Compile Include="MOAction.cs" />
     <Compile Include="MOActionAddressResolver.cs" />
     <Compile Include="MOActionPlugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Target\ActorTarget.cs" />
+    <Compile Include="Target\EntityTarget.cs" />
+    <Compile Include="Target\TargetType.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Lumina">

@@ -4,11 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MOActionPlugin
+namespace MOAction
 {
     public class ApplicableAction
     {
-        public ulong ID { set; get; }
+        public uint ID { set; get; }
         public string AbilityName { set; get; }
         public bool IsRoleAction { set; get; }
         public bool CanTargetSelf { set; get; }
@@ -18,7 +18,7 @@ namespace MOActionPlugin
         public byte ClassJobCategory { set; get; }
         public bool IsPvP { set; get; }
 
-        public ApplicableAction(ulong id, string aname, bool isrole, bool targself, bool targparty, bool targfriend, bool targenemy, byte cjc, bool ispvp)
+        public ApplicableAction(uint id, string aname, bool isrole, bool targself, bool targparty, bool targfriend, bool targenemy, byte cjc, bool ispvp)
         {
             ID = id;
             AbilityName = aname;

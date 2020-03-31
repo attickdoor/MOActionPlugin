@@ -13,10 +13,11 @@ using Serilog;
 using Lumina;
 using System.Threading.Tasks;
 using System.Threading;
+using MOAction.Target;
 
-namespace MOActionPlugin
+namespace MOAction
 {
-    internal class MOAssistPlugin : IDalamudPlugin
+    internal class MOActionPlugin : IDalamudPlugin
     {
         public string Name => "Mouseover Action Plugin";
 
@@ -26,16 +27,28 @@ namespace MOActionPlugin
         private MOAction moAction;
 
         private List<ApplicableAction> applicableActions;
+        private List<(uint key, List<(uint key2, TargetType value2)> value)> Stacks;
+        private List<TargetType> TargetTypes;
+        private String[] tTypeNames = { "Regular Target", "Focus Target", "UI Mouseover", "Field Mouseover" };
+        private List<GuiSettings> StackFlags;
+        List<ApplicableAction> actions;
+        String[] actionNames;
 
-        private string[] soloJobNames = { "AST", "WHM", "SCH", "SMN", "ACN", "BLM", "RDM", "BLU", "BRD", "MCH", "DNC", "DRK", "GNB", "WAR", "PLD", "DRG", "MNK", "SAM", "NIN" };
-        private string[] roleActionNames = { "Caster", "Ranged",  "Melee", "Tank", "Healer"};
+        private string[] soloJobNames = { "AST", "WHM", "SCH", "SMN", "BLM", "RDM", "BLU", "BRD", "MCH", "DNC", "DRK", "GNB", "WAR", "PLD", "DRG", "MNK", "SAM", "NIN" };
+        private string[] roleActionNames = { "BLM SMN RDM", "BRD MCH DNC",  "MNK DRG SAM NIN", "PLD WAR DRK GNB", "AST SCH WHM"};
 
         private bool[] flagsSelected;
         private bool isImguiMoSetupOpen = false;
 
         public void Initialize(DalamudPluginInterface pluginInterface)
         {
+            Stacks = new List<(uint key, List<(uint key2, TargetType value2)> value)>();
+
+            StackFlags = new List<GuiSettings>();
+
             this.pluginInterface = pluginInterface;
+            actions = new List<ApplicableAction>();
+            actionNames = new string[0];
 
             this.pluginInterface.CommandManager.AddHandler("/pmoaction", new CommandInfo(OnCommandDebugMouseover)
             {
@@ -49,8 +62,6 @@ namespace MOActionPlugin
                 while (!this.pluginInterface.Data.IsDataReady) { Thread.Sleep(0); }
                 InitializeData();
             });
-            
-            //PopulateActions();
 
             this.pluginInterface.UiBuilder.OnOpenConfigUi += (sender, args) => isImguiMoSetupOpen = true;
             this.pluginInterface.UiBuilder.OnBuildUi += UiBuilder_OnBuildUi;
@@ -58,10 +69,10 @@ namespace MOActionPlugin
 
         private void InitializeData()
         {
-            var actionList = pluginInterface.Data.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>().GetRows().Where(row => row.IsPlayerAction);
-            foreach (Lumina.Excel.GeneratedSheets.Action a in actionList)
+            var rawActions = pluginInterface.Data.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>().GetRows().Where(row => row.IsPlayerAction);
+            foreach (Lumina.Excel.GeneratedSheets.Action a in rawActions)
             {
-                applicableActions.Add(new ApplicableAction((ulong)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, a.CanTargetHostile, a.ClassJobCategory, a.IsPvP));
+                applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, a.CanTargetHostile, a.ClassJobCategory, a.IsPvP));
             }
             SortActions();
 
@@ -71,7 +82,15 @@ namespace MOActionPlugin
 
             Configuration = pluginInterface.GetPluginConfig() as MOActionConfiguration ?? new MOActionConfiguration();
 
-            moAction = new MOAction(pluginInterface.TargetModuleScanner, pluginInterface.ClientState, Configuration);
+            moAction = new MOAction(pluginInterface.TargetModuleScanner, pluginInterface.ClientState, Configuration, ref pluginInterface, rawActions);
+
+            TargetTypes = new List<TargetType>
+            {
+                new ActorTarget(moAction.GetRegTargPtr),
+                new EntityTarget(moAction.GetFocusPtr),
+                new EntityTarget(moAction.GetGuiMoPtr),
+                new ActorTarget(moAction.GetFieldMoPtr)
+            };
 
             moAction.Enable();
             SetNewConfig();
@@ -84,192 +103,141 @@ namespace MOActionPlugin
 
             ImGui.SetNextWindowSize(new Vector2(740, 490));
 
-            ImGui.Begin("MouseOver action setup", ref isImguiMoSetupOpen,
+            ImGui.Begin("Action stack setup", ref isImguiMoSetupOpen,
                 ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoScrollbar);
 
-            ImGui.Text("This window allows you to enable and disable actions which will affect your mouse over targets.");
+            ImGui.Text("This window allows you to set up your action stacks.");
             ImGui.Separator();
 
             ImGui.BeginChild("scrolling", new Vector2(0, 400), true, ImGuiWindowFlags.HorizontalScrollbar);
 
             ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0, 3));
-
-            ImGui.Checkbox("Enable mouseover on UI elements", ref moAction.IsGuiMOEnabled);
-            ImGui.Checkbox("Enable mouseover on field entities", ref moAction.IsFieldMOEnabled);
-
-            string lastClassJob = "";
-
-            // Support actions first
-            if (ImGui.CollapsingHeader("Support Actions"))
+            for (int i = 0; i < Stacks.Count; i++)
             {
-                ImGui.Indent();
-                for (var i = 0; i < applicableActions.Count(); i++)
+                
+                var elem = Stacks[i];
+                var currentSettings = StackFlags.ElementAt(i);
+
+                var jobname = "";
+                if (currentSettings.jobs >= 0) jobname = " - " + soloJobNames[currentSettings.jobs];
+                if (ImGui.CollapsingHeader(GetName(elem.key) + jobname +"###"+i))
                 {
-                    var action = applicableActions.ElementAt(i);
                     
-                    if (action.CanTargetParty && !action.IsPvP && !action.IsRoleAction)
+                    ImGui.PushItemWidth(70);
+                    
+                    ImGui.Combo("Job##" +i, ref StackFlags.ElementAt(i).jobs, soloJobNames, soloJobNames.Length);
+                    ImGui.PopItemWidth();
+                    
+                    ImGui.Indent();
+                    if (currentSettings.jobs != -1)
                     {
-                        if (!lastClassJob.Equals(ClassJobCategoryToName(action.ClassJobCategory)))
+                        actions = applicableActions.
+                                    Where(item => ClassJobCategoryToName(item.ClassJobCategory).
+                                                    Contains(soloJobNames[currentSettings.jobs]) && 
+                                                    !item.IsPvP &&
+                                                    (item.CanTargetFriendly || item.CanTargetHostile)).
+                                    ToList();
+                        actionNames = actions.Select(s => s.AbilityName).ToArray();
+                        
+                        if (currentSettings.lastJob != currentSettings.jobs)
                         {
-                            lastClassJob = ClassJobCategoryToName(action.ClassJobCategory);
-                            if (ImGui.CollapsingHeader(lastClassJob + "##Support"))
-                            {
-                                for (int j = i; j < applicableActions.Count(); j++)
-                                {
-                                    action = applicableActions.ElementAt(j);
-
-                                    if (!lastClassJob.Equals(ClassJobCategoryToName(action.ClassJobCategory)))
-                                    {
-                                        break;
-                                    }
-                                    if (action.CanTargetParty && !action.IsPvP && !action.IsRoleAction)
-                                    {
-                                        ImGui.Checkbox(action.AbilityName, ref flagsSelected[j]);
-                                    }
-                                }
-
-                            }
+                            for (int j = 0; j < currentSettings.stackAbilities.Count; j++)
+                                StackFlags.ElementAt(i).stackAbilities[j] = -1;
+                            StackFlags.ElementAt(i).baseAbility = -1;
+                            StackFlags.ElementAt(i).lastJob = currentSettings.jobs;
                         }
                     }
+                    else
+                    {
+                        actions = new List<ApplicableAction>();
+                        actionNames = new string[0];
+                        for (int j = 0; j < currentSettings.stackAbilities.Count; j++)
+                            StackFlags.ElementAt(i).stackAbilities[j] = -1;
+                        StackFlags.ElementAt(i).baseAbility = -1;
+                    }
+                    StackFlags.ElementAt(i).lastJob = StackFlags.ElementAt(i).jobs;
+                    ImGui.PushItemWidth(200);
+                    ImGui.Combo("Base Ability##"+i, ref StackFlags.ElementAt(i).baseAbility, actionNames, actions.Count);
+                    var tmptargs = StackFlags[i].stackTargets.ToArray();
+                    var tmpabilities = StackFlags[i].stackAbilities.ToArray();
+                    ImGui.Indent();
+                    for (int j = 0; j < Stacks[i].value.Count; j++) {
+                        ImGui.Text("Ability #" + (j + 1));
+                        ImGui.Combo("Target##"+i.ToString()+j.ToString(), ref tmptargs[j], tTypeNames, TargetTypes.Count);
+                        ImGui.SameLine(0, 35);
+                        ImGui.Combo("Ability##" + i.ToString() + j.ToString(), ref tmpabilities[j], actionNames, actions.Count);
+
+                        if (tmptargs.Length != 1) ImGui.SameLine(0, 10);
+                        if (tmptargs.Length != 1 && ImGui.Button("Delete Ability##" + i.ToString() + j.ToString()))
+                        {
+                            Stacks[i].value.RemoveAt(j);
+                            StackFlags[i].stackAbilities.RemoveAt(j);
+                            StackFlags[i].stackTargets.RemoveAt(j);
+                            tmptargs = StackFlags[i].stackTargets.ToArray();
+                            tmpabilities = StackFlags[i].stackAbilities.ToArray();
+                        }
+                    }
+                    ImGui.Unindent();
+                    ImGui.PopItemWidth();
+                    StackFlags.ElementAt(i).stackTargets = tmptargs.ToList();
+                    StackFlags.ElementAt(i).stackAbilities = tmpabilities.ToList();
+                    (uint key, List<(uint key2, TargetType value2)> value) tmpelem = (0, null);
+                    if (StackFlags.ElementAt(i).baseAbility != -1)
+                    {
+                        elem.key = actions[StackFlags.ElementAt(i).baseAbility].ID;
+                        tmpelem.key = actions[StackFlags.ElementAt(i).baseAbility].ID;
+                    }
+
+                    if (actions.Count > 0)
+                    {
+                        List<(uint key2, TargetType value2)> val2 = new List<(uint key2, TargetType value2)>(1);
+                        for (var j = 0; j < tmptargs.Length; j++)
+                        {
+                            if (StackFlags.ElementAt(i).stackAbilities[j] > -1 && tmptargs[j] > -1)
+                            {
+                                val2.Add((actions[StackFlags.ElementAt(i).stackAbilities[j]].ID, TargetTypes[tmptargs[j]]));
+                            }
+                            else
+                            {
+                                val2.Add(((uint)StackFlags.ElementAt(i).stackAbilities[j], null));
+                            }
+                        }
+                        tmpelem.value = val2;
+                        elem.value = val2;
+                    }
+                    if (ImGui.Button("Add action to bottom of stack##" + i))
+                    {
+                        if (StackFlags.ElementAt(i).stackAbilities.Last() != -1)
+                        {
+                            elem.value.Add((0, null));
+                            StackFlags.ElementAt(i).stackAbilities.Add(-1);
+                            StackFlags.ElementAt(i).stackTargets.Add(-1);
+                        }
+                    }
+                    //StackFlags.RemoveAt(i);
+                    //StackFlags.Insert(i, tmp);
+                    Stacks.RemoveAt(i);
+                    Stacks.Insert(i, elem);
+                    ImGui.Unindent();
                 }
-                ImGui.Unindent();
             }
-            lastClassJob = "";
-            // Then combat actions
-            if (ImGui.CollapsingHeader("Damage Actions"))
+            
+            if (ImGui.Button("Add stack"))
             {
-                ImGui.Indent();
-                for (var i = 0; i < applicableActions.Count(); i++)
+                if (Stacks.Count == 0 || Stacks.Last().key != 0)
                 {
-                    var action = applicableActions.ElementAt(i);
-
-                    if (action.CanTargetHostile && !action.IsPvP && !action.IsRoleAction)
+                    List<(uint, TargetType)> newStack = new List<(uint, TargetType)>
                     {
-                        if (!lastClassJob.Equals(ClassJobCategoryToName(action.ClassJobCategory)))
-                        {
-                            lastClassJob = ClassJobCategoryToName(action.ClassJobCategory);
-                            if (ImGui.CollapsingHeader(lastClassJob + "##Damage"))
-                            {
-                                for (int j = i; j < applicableActions.Count(); j++)
-                                {
-                                    action = applicableActions.ElementAt(j);
-                                    if (!lastClassJob.Equals(ClassJobCategoryToName(action.ClassJobCategory)))
-                                    {
-                                        break;
-                                    }
-                                    if (action.CanTargetHostile && !action.IsPvP && !action.IsRoleAction)
-                                    {
-                                        ImGui.Checkbox(action.AbilityName, ref flagsSelected[j]);
-                                    }
-                                }
-
-                            }
-                        }
-                    }
+                        (0, null)
+                    };
+                    Stacks.Add((0, newStack));
+                    List<int> tmp1 = new List<int>(1);
+                    List<int> tmp2 = new List<int>(1);
+                    tmp1.Add(-1);
+                    tmp2.Add(-1);
+                    StackFlags.Add(new GuiSettings(-1, -1, -1, tmp1, tmp2));
                 }
-                ImGui.Unindent();
             }
-            lastClassJob = "";
-            // Role Actions
-            if (ImGui.CollapsingHeader("Role Actions"))
-            {
-                ImGui.Indent();
-                for (var i = 0; i < applicableActions.Count(); i++)
-                {
-                    var action = applicableActions.ElementAt(i);
-                    if (action.IsRoleAction)
-                    {
-                        if (!lastClassJob.Equals(ClassJobCategoryToName(action.ClassJobCategory)))
-                        {
-                            lastClassJob = ClassJobCategoryToName(action.ClassJobCategory);
-                            if (ImGui.CollapsingHeader(lastClassJob))
-                            {
-                                for (int j = i; j < applicableActions.Count(); j++)
-                                {
-                                    action = applicableActions.ElementAt(j);
-                                    if (!lastClassJob.Equals(ClassJobCategoryToName(action.ClassJobCategory)))
-                                    {
-                                        break;
-                                    }
-                                    if (!action.IsPvP && (action.CanTargetHostile || action.CanTargetParty))
-                                        ImGui.Checkbox(action.AbilityName, ref flagsSelected[j]);
-                                }
-
-                            }
-                        }
-                    }
-                }
-                ImGui.Unindent();
-            }
-            lastClassJob = "";
-            // Repeat for PvP
-            if (ImGui.CollapsingHeader("PvP Support"))
-            {
-                ImGui.Indent();
-                for (var i = 0; i < applicableActions.Count(); i++)
-                {
-                    var action = applicableActions.ElementAt(i);
-                    if (action.CanTargetParty && action.IsPvP)
-                    {
-                        if (!lastClassJob.Equals(ClassJobCategoryToName(action.ClassJobCategory)))
-                        {
-                            lastClassJob = ClassJobCategoryToName(action.ClassJobCategory);
-                            if (ImGui.CollapsingHeader(lastClassJob + "##PVP Support"))
-                            {
-                                for (int j = i; j < applicableActions.Count(); j++)
-                                {
-                                    action = applicableActions.ElementAt(j);
-                                    if (!lastClassJob.Equals(ClassJobCategoryToName(action.ClassJobCategory)))
-                                    {
-                                        break;
-                                    }
-                                    if (action.CanTargetParty && action.IsPvP)
-                                    {
-                                        ImGui.Checkbox(action.AbilityName, ref flagsSelected[j]);
-                                    }
-                                }
-
-                            }
-                        }
-                    }
-                }
-                ImGui.Unindent();
-            }
-            lastClassJob = "";
-            if (ImGui.CollapsingHeader("PvP Damage"))
-            {
-                ImGui.Indent();
-                for (var i = 0; i < applicableActions.Count(); i++)
-                {
-                    var action = applicableActions.ElementAt(i);
-                    if (action.CanTargetHostile && action.IsPvP)
-                    {
-                        if (!lastClassJob.Equals(ClassJobCategoryToName(action.ClassJobCategory)))
-                        {
-                            lastClassJob = ClassJobCategoryToName(action.ClassJobCategory);
-                            if (ImGui.CollapsingHeader(lastClassJob + "##PVP Damage"))
-                            {
-
-                                for (int j = i; j < applicableActions.Count(); j++)
-                                {
-                                    action = applicableActions.ElementAt(j);
-                                    if (!lastClassJob.Equals(ClassJobCategoryToName(action.ClassJobCategory)))
-                                    {
-                                        break;
-                                    }
-                                    if (action.CanTargetHostile && action.IsPvP)
-                                    {
-                                        ImGui.Checkbox(action.AbilityName, ref flagsSelected[j]);
-                                    }
-                                }
-
-                            }
-                        }
-                    }
-                }
-                ImGui.Unindent();
-            }
-
 
             ImGui.PopStyleVar();
 
@@ -277,34 +245,18 @@ namespace MOActionPlugin
 
             ImGui.Separator();
 
-            if (ImGui.Button("Enable All"))
-            {
-                for (var i = 0; i < flagsSelected.Length; i++)
-                {
-                    flagsSelected[i] = true;
-                }
-            }
-
-            ImGui.SameLine();
-
-            if (ImGui.Button("Disable All"))
-            {
-                for (var i = 0; i < flagsSelected.Length; i++)
-                {
-                    flagsSelected[i] = false;
-                }
-            }
-
-            ImGui.SameLine();
-
             if (ImGui.Button("Save and Close"))
             {
+                /*
                 UpdateList(flagsSelected);
                 UpdateConfig();
                 pluginInterface.SavePluginConfig(Configuration);
                 
                 SetNewConfig();
+                */
                 isImguiMoSetupOpen = false;
+                foreach((uint key, List<(uint key2, TargetType val2)> val) stack in this.Stacks)
+                moAction.Stacks[stack.key] = stack.val;
             }
 
             ImGui.Spacing();
@@ -318,28 +270,13 @@ namespace MOActionPlugin
             Configuration.ActiveIDs = moAction.enabledActions;
         }
 
-        private void UpdateList(bool[] flags)
-        {
-            for (int i = 0; i < applicableActions.Count(); i++)
-            {
-                if (flags[i] == true)
-                {
-                    moAction.EnableAction(applicableActions.ElementAt(i).ID);
-                }
-                else
-                {
-                    moAction.RemoveAction(applicableActions.ElementAt(i).ID);
-                }
-            }
-        }
-
         private void SetNewConfig()
         {
             moAction.IsGuiMOEnabled = Configuration.IsGuiMO;
             moAction.IsFieldMOEnabled = Configuration.IsFieldMO;
             foreach (ulong l in Configuration.ActiveIDs)
             {
-                moAction.EnableAction(l);
+                //moAction.EnableAction(l);
                 // I am not a smart programmer.
                 // This will be much better once I figure out how to work with Lumina.
                 for (int i = 0; i < flagsSelected.Length; i++)
@@ -362,6 +299,12 @@ namespace MOActionPlugin
         private void OnCommandDebugMouseover(string command, string arguments)
         {
             isImguiMoSetupOpen = true;
+        }
+
+        private String GetName(uint actionID)
+        {
+            if (actionID == 0) return "Unset Action";
+            return applicableActions.Single(elem => elem.ID == actionID).AbilityName;
         }
 
         private string ClassJobCategoryToName(byte key)
@@ -404,15 +347,15 @@ namespace MOActionPlugin
                 case 50: return "BRD";
                 case 53: return "WHM";
                 case 55: return "BLM";
-                case 59: return "Tank";
-                case 61: return "Healer";
-                case 63: return "Caster";
-                case 64: return "Healer";
-                case 66: return "Ranged";
-                case 68: return "ACN";
+                case 59: return "PLD WAR DRK GNB";
+                case 61: return "AST SCH WHM";
+                case 63: return "BLM SMN RDM";
+                case 64: return "AST SCH WHM";
+                case 66: return "BRD MCH DNC";
+                case 68: return "SMN SCH";
                 case 69: return "SMN";
-                case 73: return "Healer";
-                case 89: return "Caster";
+                case 73: return "AST SCH WHM";
+                case 89: return "BLM SMN RDM";
                 case 91: return "ROG";
                 case 92: return "NIN";
                 case 93: return "NIN";
@@ -425,21 +368,21 @@ namespace MOActionPlugin
                 case 106: return "BRD";
                 case 111: return "SAM";
                 case 112: return "RDM";
-                case 113: return "Tank";
-                case 114: return "Melee";
-                case 115: return "Ranged";
-                case 116: return "Caster";
-                case 117: return "Healer";
-                case 121: return "Tank";
-                case 122: return "Melee";
-                case 123: return "Ranged";
-                case 125: return "Healer";
+                case 113: return "PLD WAR DRK GNB";
+                case 114: return "MNK DRG SAM NIN";
+                case 115: return "BRD MCH DNC";
+                case 116: return "BLM SMN RDM";
+                case 117: return "AST SCH WHM";
+                case 121: return "PLD WAR DRK GNB";
+                case 122: return "MNK DRG SAM NIN";
+                case 123: return "BRD MCH DNC";
+                case 125: return "AST SCH WHM";
                 case 129: return "BLU";
-                case 133: return "Healer";
-                case 134: return "Tank";
-                case 139: return "Ranged";
-                case 147: return "Caster";
-                case 148: return "Melee";
+                case 133: return "AST SCH WHM";
+                case 134: return "PLD WAR DRK GNB";
+                case 139: return "BRD MCH DNC";
+                case 147: return "BLM SMN RDM";
+                case 148: return "MNK DRG SAM NIN";
                 case 149: return "GNB";
                 case 150: return "DNC";
                 case 160: return "SCH";
