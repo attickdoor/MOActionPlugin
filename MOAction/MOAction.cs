@@ -10,6 +10,7 @@ using Dalamud.Game.ClientState.Actors.Types.NonPlayer;
 using Dalamud.Game.ClientState.Structs.JobGauge;
 using Dalamud.Hooking;
 using Dalamud.Plugin;
+using MOAction.Configuration;
 using MOAction.Target;
 using Serilog;
 
@@ -29,7 +30,7 @@ namespace MOAction
         private Hook<OnRequestActionDetour> requestActionHook;
         private Hook<OnSetUiMouseoverEntityId> uiMoEntityIdHook;
 
-        public Dictionary<uint, List<(uint actionid, TargetType targ)>> Stacks { get; set; }
+        public Dictionary<uint, List<StackEntry>> Stacks { get; set; }
         private DalamudPluginInterface pluginInterface;
         private IEnumerable<Lumina.Excel.GeneratedSheets.Action> RawActions;
 
@@ -57,7 +58,7 @@ namespace MOAction
             pluginInterface = plugin;
             RawActions = rawActions;
 
-            Stacks = new Dictionary<uint, List<(uint actionid, TargetType targ)>>();
+            Stacks = new Dictionary<uint, List<StackEntry>>();
 
             Log.Verbose("===== M O A C T I O N =====");
             Log.Verbose("RequestAction address {IsIconReplaceable}", Address.RequestAction);
@@ -67,17 +68,6 @@ namespace MOAction
             uiMoEntityIdHook = new Hook<OnSetUiMouseoverEntityId>(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId), this);
 
             enabledActions = new HashSet<ulong>();
-        }
-
-        public void EnableAction(uint ActionID, List<(uint actionid, TargetType targ)> stack)
-        {
-            if (Stacks.ContainsKey(ActionID)) Stacks[ActionID] = stack;
-            Stacks.Add(ActionID, stack);
-        }
-
-        public void RemoveAction(uint ActionID)
-        {
-            if (Stacks.ContainsKey(ActionID)) Stacks.Remove(ActionID);
         }
 
         public void Enable()
@@ -112,29 +102,31 @@ namespace MOAction
         {
             if (Stacks.ContainsKey(ActionID))
             {
-                List<(uint actionid, TargetType targ)> stack = Stacks[ActionID];
-                foreach ((uint actionid, TargetType targ) t in stack)
+                List<StackEntry> stack = Stacks[ActionID];
+                foreach (StackEntry t in stack)
                 {
-                    if (CanUseAction(t)) return (t.actionid, t.targ.GetTargetActorId());
+                    if (CanUseAction(t)) return (t.actionID, t.target.GetTargetActorId());
                 }
             }
             return (0, 0);
         }
 
-        private bool CanUseAction((ulong actionid, TargetType targ) targ)
+        private bool CanUseAction(StackEntry targ)
         {
-            var action = RawActions.Single(row => (ulong)row.RowId == targ.actionid);
+            if (targ.target == null || targ.actionID == 0) return false;
+            var action = RawActions.SingleOrDefault(row => (ulong)row.RowId == targ.actionID);
+            
 
             for (var i = 0; i < this.pluginInterface.ClientState.Actors.Length; i++)
             {
                 var a = this.pluginInterface.ClientState.Actors[i];
-                if (a.ActorId == targ.targ.GetTargetActorId())
+                if (a.ActorId == targ.target.GetTargetActorId())
                 {
-                    if (a is PlayerCharacter) return action.CanTargetFriendly;
+                    if (a is PlayerCharacter) return action.CanTargetFriendly || action.CanTargetParty || action.RowId == 17055 || action.RowId == 7443;
                     if (a is BattleNpc)
                     {
                         BattleNpc b = (BattleNpc)a;
-                        if (b.BattleNpcKind != BattleNpcSubKind.Enemy) return action.CanTargetFriendly;
+                        if (b.BattleNpcKind != BattleNpcSubKind.Enemy) return action.CanTargetFriendly || action.CanTargetParty || action.RowId == 17055 || action.RowId == 7443;
                     }
                     return action.CanTargetHostile;
                 }

@@ -9,7 +9,7 @@ namespace MOAction.Target
     public abstract class TargetType
     {
         public delegate IntPtr PtrFunc();
-        protected PtrFunc getPtr;
+        public PtrFunc getPtr;
 
         public TargetType(PtrFunc function)
         {

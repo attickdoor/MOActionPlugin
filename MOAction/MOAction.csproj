@@ -55,6 +55,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Configuration\StackEntry.cs" />
     <Compile Include="GuiSettings.cs" />
     <Compile Include="Configuration\ApplicableAction.cs" />
     <Compile Include="Configuration\MOActionConfiguration.cs" />

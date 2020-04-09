@@ -14,6 +14,7 @@ using Lumina;
 using System.Threading.Tasks;
 using System.Threading;
 using MOAction.Target;
+using MOAction.Configuration;
 
 namespace MOAction
 {
@@ -27,22 +28,21 @@ namespace MOAction
         private MOAction moAction;
 
         private List<ApplicableAction> applicableActions;
-        private List<(uint key, List<(uint key2, TargetType value2)> value)> Stacks;
+        private List<(uint key, List<StackEntry> value)> Stacks;
         private List<TargetType> TargetTypes;
-        private String[] tTypeNames = { "Regular Target", "Focus Target", "UI Mouseover", "Field Mouseover" };
+        private readonly string[] tTypeNames = { "Regular Target", "Focus Target", "UI Mouseover", "Field Mouseover" };
         private List<GuiSettings> StackFlags;
         List<ApplicableAction> actions;
         String[] actionNames;
 
-        private string[] soloJobNames = { "AST", "WHM", "SCH", "SMN", "BLM", "RDM", "BLU", "BRD", "MCH", "DNC", "DRK", "GNB", "WAR", "PLD", "DRG", "MNK", "SAM", "NIN" };
-        private string[] roleActionNames = { "BLM SMN RDM", "BRD MCH DNC",  "MNK DRG SAM NIN", "PLD WAR DRK GNB", "AST SCH WHM"};
+        private readonly string[] soloJobNames = { "AST", "WHM", "SCH", "SMN", "BLM", "RDM", "BLU", "BRD", "MCH", "DNC", "DRK", "GNB", "WAR", "PLD", "DRG", "MNK", "SAM", "NIN" };
+        private readonly string[] roleActionNames = { "BLM SMN RDM", "BRD MCH DNC",  "MNK DRG SAM NIN", "PLD WAR DRK GNB", "AST SCH WHM"};
 
-        private bool[] flagsSelected;
         private bool isImguiMoSetupOpen = false;
 
         public void Initialize(DalamudPluginInterface pluginInterface)
         {
-            Stacks = new List<(uint key, List<(uint key2, TargetType value2)> value)>();
+            Stacks = new List<(uint key, List<StackEntry> value)>();
 
             StackFlags = new List<GuiSettings>();
 
@@ -75,22 +75,25 @@ namespace MOAction
                 applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, a.CanTargetHostile, a.ClassJobCategory, a.IsPvP));
             }
             SortActions();
-
-            flagsSelected = new bool[applicableActions.Count()];
-            for (var i = 0; i < flagsSelected.Length; i++)
-                flagsSelected[i] = false;
-
-            Configuration = pluginInterface.GetPluginConfig() as MOActionConfiguration ?? new MOActionConfiguration();
+            var config = pluginInterface.GetPluginConfig();
+            /*
+            if (config.Version == 0)
+            {
+                config = new MOActionConfiguration();
+                config.Version = 1;
+            }
+            */
+            config.Version = 1;
+            Configuration = config as MOActionConfiguration;
+            //Configuration = pluginInterface.GetPluginConfig() as MOActionConfiguration ?? new MOActionConfiguration();
 
             moAction = new MOAction(pluginInterface.TargetModuleScanner, pluginInterface.ClientState, Configuration, ref pluginInterface, rawActions);
 
-            TargetTypes = new List<TargetType>
-            {
-                new ActorTarget(moAction.GetRegTargPtr),
-                new EntityTarget(moAction.GetFocusPtr),
-                new EntityTarget(moAction.GetGuiMoPtr),
-                new ActorTarget(moAction.GetFieldMoPtr)
-            };
+            TargetTypes = new List<TargetType>();
+            TargetTypes.Add(new ActorTarget(moAction.GetRegTargPtr));
+            TargetTypes.Add(new EntityTarget(moAction.GetFocusPtr));
+            TargetTypes.Add(new EntityTarget(moAction.GetGuiMoPtr));
+            TargetTypes.Add(new ActorTarget(moAction.GetFieldMoPtr));
 
             moAction.Enable();
             SetNewConfig();
@@ -101,50 +104,57 @@ namespace MOAction
             if (!isImguiMoSetupOpen)
                 return;
 
-            ImGui.SetNextWindowSize(new Vector2(740, 490));
+            //ImGui.SetNextWindowSize(new Vector2(740, 490));
 
             ImGui.Begin("Action stack setup", ref isImguiMoSetupOpen,
-                ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoScrollbar);
+                ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar);
 
             ImGui.Text("This window allows you to set up your action stacks.");
+            ImGui.Text("YOU SHOULD PROBABLY WATCH THIS VIDEO FOR THE 2.0 UPDATE: ");
+            ImGui.SameLine();
+            if (ImGui.Button("\"This video\""))
+            {
+                System.Diagnostics.Process.Start("https://youtu.be/pm4eCxD90gs");
+            }
             ImGui.Separator();
-
-            ImGui.BeginChild("scrolling", new Vector2(0, 400), true, ImGuiWindowFlags.HorizontalScrollbar);
+            ImGui.BeginChild("scrolling", new Vector2(0, ImGui.GetWindowSize().Y - 125), true, ImGuiWindowFlags.NoScrollbar);
 
             ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0, 3));
-            for (int i = 0; i < Stacks.Count; i++)
+            for (int i = 0; i < StackFlags.Count; i++)
             {
-                
                 var elem = Stacks[i];
                 var currentSettings = StackFlags.ElementAt(i);
 
+                if (!currentSettings.isOpen)
+                {
+                    StackFlags.RemoveAt(i);
+                    Stacks.RemoveAt(i);
+                    i--;
+                    continue;
+                }
+
                 var jobname = "";
                 if (currentSettings.jobs >= 0) jobname = " - " + soloJobNames[currentSettings.jobs];
-                if (ImGui.CollapsingHeader(GetName(elem.key) + jobname +"###"+i))
+                if (ImGui.CollapsingHeader(GetName(elem.key) + jobname +"###"+i, ref StackFlags[i].isOpen))
                 {
                     
                     ImGui.PushItemWidth(70);
                     
-                    ImGui.Combo("Job##" +i, ref StackFlags.ElementAt(i).jobs, soloJobNames, soloJobNames.Length);
+                    ImGui.Combo("Job##" +i, ref StackFlags[i].jobs, soloJobNames, soloJobNames.Length);
                     ImGui.PopItemWidth();
                     
                     ImGui.Indent();
                     if (currentSettings.jobs != -1)
                     {
-                        actions = applicableActions.
-                                    Where(item => ClassJobCategoryToName(item.ClassJobCategory).
-                                                    Contains(soloJobNames[currentSettings.jobs]) && 
-                                                    !item.IsPvP &&
-                                                    (item.CanTargetFriendly || item.CanTargetHostile)).
-                                    ToList();
+                        actions = GetJobActions(currentSettings.jobs);
                         actionNames = actions.Select(s => s.AbilityName).ToArray();
                         
                         if (currentSettings.lastJob != currentSettings.jobs)
                         {
                             for (int j = 0; j < currentSettings.stackAbilities.Count; j++)
-                                StackFlags.ElementAt(i).stackAbilities[j] = -1;
-                            StackFlags.ElementAt(i).baseAbility = -1;
-                            StackFlags.ElementAt(i).lastJob = currentSettings.jobs;
+                                StackFlags[i].stackAbilities[j] = -1;
+                            StackFlags[i].baseAbility = -1;
+                            StackFlags[i].lastJob = currentSettings.jobs;
                         }
                     }
                     else
@@ -152,12 +162,12 @@ namespace MOAction
                         actions = new List<ApplicableAction>();
                         actionNames = new string[0];
                         for (int j = 0; j < currentSettings.stackAbilities.Count; j++)
-                            StackFlags.ElementAt(i).stackAbilities[j] = -1;
-                        StackFlags.ElementAt(i).baseAbility = -1;
+                            StackFlags[i].stackAbilities[j] = -1;
+                        StackFlags[i].baseAbility = -1;
                     }
-                    StackFlags.ElementAt(i).lastJob = StackFlags.ElementAt(i).jobs;
+                    StackFlags[i].lastJob = StackFlags[i].jobs;
                     ImGui.PushItemWidth(200);
-                    ImGui.Combo("Base Ability##"+i, ref StackFlags.ElementAt(i).baseAbility, actionNames, actions.Count);
+                    ImGui.Combo("Base Ability##"+i, ref StackFlags[i].baseAbility, actionNames, actions.Count);
                     var tmptargs = StackFlags[i].stackTargets.ToArray();
                     var tmpabilities = StackFlags[i].stackAbilities.ToArray();
                     ImGui.Indent();
@@ -179,27 +189,27 @@ namespace MOAction
                     }
                     ImGui.Unindent();
                     ImGui.PopItemWidth();
-                    StackFlags.ElementAt(i).stackTargets = tmptargs.ToList();
-                    StackFlags.ElementAt(i).stackAbilities = tmpabilities.ToList();
-                    (uint key, List<(uint key2, TargetType value2)> value) tmpelem = (0, null);
-                    if (StackFlags.ElementAt(i).baseAbility != -1)
+                    StackFlags[i].stackTargets = tmptargs.ToList();
+                    StackFlags[i].stackAbilities = tmpabilities.ToList();
+                    (uint key, List<StackEntry> value) tmpelem = (0, null);
+                    if (StackFlags[i].baseAbility != -1)
                     {
-                        elem.key = actions[StackFlags.ElementAt(i).baseAbility].ID;
-                        tmpelem.key = actions[StackFlags.ElementAt(i).baseAbility].ID;
+                        elem.key = actions[StackFlags[i].baseAbility].ID;
+                        tmpelem.key = actions[StackFlags[i].baseAbility].ID;
                     }
 
                     if (actions.Count > 0)
                     {
-                        List<(uint key2, TargetType value2)> val2 = new List<(uint key2, TargetType value2)>(1);
+                        List<StackEntry> val2 = new List<StackEntry>(1);
                         for (var j = 0; j < tmptargs.Length; j++)
                         {
-                            if (StackFlags.ElementAt(i).stackAbilities[j] > -1 && tmptargs[j] > -1)
+                            if (StackFlags[i].stackAbilities[j] > -1 && tmptargs[j] > -1)
                             {
-                                val2.Add((actions[StackFlags.ElementAt(i).stackAbilities[j]].ID, TargetTypes[tmptargs[j]]));
+                                val2.Add(new StackEntry(actions[StackFlags[i].stackAbilities[j]].ID, TargetTypes[tmptargs[j]]));
                             }
                             else
                             {
-                                val2.Add(((uint)StackFlags.ElementAt(i).stackAbilities[j], null));
+                                val2.Add(new StackEntry((uint)StackFlags[i].stackAbilities[j], null));
                             }
                         }
                         tmpelem.value = val2;
@@ -207,11 +217,11 @@ namespace MOAction
                     }
                     if (ImGui.Button("Add action to bottom of stack##" + i))
                     {
-                        if (StackFlags.ElementAt(i).stackAbilities.Last() != -1)
+                        if (StackFlags[i].stackAbilities.Last() != -1)
                         {
-                            elem.value.Add((0, null));
-                            StackFlags.ElementAt(i).stackAbilities.Add(-1);
-                            StackFlags.ElementAt(i).stackTargets.Add(-1);
+                            elem.value.Add(new StackEntry(0, null));
+                            StackFlags[i].stackAbilities.Add(-1);
+                            StackFlags[i].stackTargets.Add(-1);
                         }
                     }
                     //StackFlags.RemoveAt(i);
@@ -224,18 +234,20 @@ namespace MOAction
             
             if (ImGui.Button("Add stack"))
             {
-                if (Stacks.Count == 0 || Stacks.Last().key != 0)
+                if (StackFlags.Count == 0 || StackFlags.Last().jobs != -1)
                 {
-                    List<(uint, TargetType)> newStack = new List<(uint, TargetType)>
+                    
+                    List<StackEntry> newStack = new List<StackEntry>
                     {
-                        (0, null)
+                        new StackEntry(0, null)
                     };
                     Stacks.Add((0, newStack));
+                    
                     List<int> tmp1 = new List<int>(1);
                     List<int> tmp2 = new List<int>(1);
                     tmp1.Add(-1);
                     tmp2.Add(-1);
-                    StackFlags.Add(new GuiSettings(-1, -1, -1, tmp1, tmp2));
+                    StackFlags.Add(new GuiSettings(true, -1, -1, -1, tmp1, tmp2));
                 }
             }
 
@@ -247,16 +259,35 @@ namespace MOAction
 
             if (ImGui.Button("Save and Close"))
             {
-                /*
-                UpdateList(flagsSelected);
+                isImguiMoSetupOpen = false;
+                for (var i = 0; i < StackFlags.Count; i++)
+                { 
+                    //var stack = Stacks[i];
+
+                    for(var j = 0; j < StackFlags[i].stackAbilities.Count; j++)
+                    {
+                        if (StackFlags[i].stackAbilities[j] == -1 || StackFlags[i].stackTargets[j] == -1)
+                        {
+                            StackFlags[i].stackAbilities.RemoveAt(j);
+                            StackFlags[i].stackTargets.RemoveAt(j);
+                            j--;
+                        }
+                    }
+                    if (StackFlags[i].stackAbilities.Count == 0)
+                    {
+                        StackFlags.RemoveAt(i);
+                        i--;
+                    }
+
+                    /*
+                    if (stack.value[0].actionID > 0)
+                        moAction.Stacks[stack.key] = stack.value;
+                        */
+                }
                 UpdateConfig();
                 pluginInterface.SavePluginConfig(Configuration);
-                
+
                 SetNewConfig();
-                */
-                isImguiMoSetupOpen = false;
-                foreach((uint key, List<(uint key2, TargetType val2)> val) stack in this.Stacks)
-                moAction.Stacks[stack.key] = stack.val;
             }
 
             ImGui.Spacing();
@@ -265,25 +296,29 @@ namespace MOAction
 
         private void UpdateConfig()
         {
-            Configuration.IsFieldMO = moAction.IsFieldMOEnabled;
-            Configuration.IsGuiMO = moAction.IsGuiMOEnabled;
-            Configuration.ActiveIDs = moAction.enabledActions;
+            Configuration.SetStackFlags(StackFlags);
+            Configuration.SetStacks(Stacks);
         }
 
         private void SetNewConfig()
         {
-            moAction.IsGuiMOEnabled = Configuration.IsGuiMO;
-            moAction.IsFieldMOEnabled = Configuration.IsFieldMO;
-            foreach (ulong l in Configuration.ActiveIDs)
+            moAction.Stacks.Clear();
+            Stacks.Clear();
+            //Stacks = Configuration.Stacks;
+            StackFlags = Configuration.StackFlags;
+            for (var i = 0; i < StackFlags.Count; i++)
             {
-                //moAction.EnableAction(l);
-                // I am not a smart programmer.
-                // This will be much better once I figure out how to work with Lumina.
-                for (int i = 0; i < flagsSelected.Length; i++)
-                {
-                    if (applicableActions.ElementAt(i).ID == l)
-                        flagsSelected[i] = true;
+                var actions = GetJobActions(StackFlags[i].jobs);
+                var hasActions = actions.Count > 0;
+                if (!hasActions) Stacks.Add((0, new List<StackEntry>()));
+                else Stacks.Add((actions[StackFlags[i].baseAbility].ID, new List<StackEntry>()));
+                for (var j = 0; j < StackFlags[i].stackAbilities.Count; j++) {
+                    if (!hasActions) Stacks[i].value.Add(new StackEntry(0, null));
+                    else Stacks[i].value.Add(new StackEntry(actions[StackFlags[i].stackAbilities[j]].ID, TargetTypes[StackFlags[i].stackTargets[j]]));
+                    //Stacks[i].value[j].target = TargetTypes[StackFlags[i].stackTargets[j]];
                 }
+                if (Stacks[i].key > 0)
+                    moAction.Stacks[Stacks[i].key] = Stacks[i].value;
             }
         }
 
@@ -389,6 +424,21 @@ namespace MOAction
                 default: return "Unknown";
 
             }
+        }
+
+        private List<ApplicableAction> GetJobActions(int index)
+        {
+            if (index >= 0)
+            {
+                return applicableActions.
+                        Where(item => ClassJobCategoryToName(item.ClassJobCategory).
+                                        Contains(soloJobNames[index]) &&
+                                        !item.IsPvP &&
+                                        (item.CanTargetParty || item.CanTargetHostile
+                                        || item.ID == 17055 || item.ID == 7443)).
+                        ToList();
+            }
+            return new List<ApplicableAction>();
         }
 
         private void SortActions()
