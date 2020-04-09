@@ -30,7 +30,7 @@ namespace MOAction
         private List<ApplicableAction> applicableActions;
         private List<(uint key, List<StackEntry> value)> Stacks;
         private List<TargetType> TargetTypes;
-        private readonly string[] tTypeNames = { "Regular Target", "Focus Target", "UI Mouseover", "Field Mouseover" };
+        private readonly string[] tTypeNames = { "UI Mouseover", "Field Mouseover", "Regular Target", "Focus Target" };
         private List<GuiSettings> StackFlags;
         List<ApplicableAction> actions;
         String[] actionNames;
@@ -39,6 +39,8 @@ namespace MOAction
         private readonly string[] roleActionNames = { "BLM SMN RDM", "BRD MCH DNC",  "MNK DRG SAM NIN", "PLD WAR DRK GNB", "AST SCH WHM"};
 
         private bool isImguiMoSetupOpen = false;
+
+        private readonly int CURRENT_CONFIG_VERSION = 1;
 
         public void Initialize(DalamudPluginInterface pluginInterface)
         {
@@ -75,25 +77,27 @@ namespace MOAction
                 applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, a.CanTargetHostile, a.ClassJobCategory, a.IsPvP));
             }
             SortActions();
-            var config = pluginInterface.GetPluginConfig();
-            /*
-            if (config.Version == 0)
+            var config = pluginInterface.GetPluginConfig() as MOActionConfiguration ?? new MOActionConfiguration();
+            
+            if (config.Version < CURRENT_CONFIG_VERSION)
             {
                 config = new MOActionConfiguration();
-                config.Version = 1;
+                config.Version = CURRENT_CONFIG_VERSION;
             }
-            */
-            config.Version = 1;
+            
+            //config.Version = 1;
             Configuration = config as MOActionConfiguration;
             //Configuration = pluginInterface.GetPluginConfig() as MOActionConfiguration ?? new MOActionConfiguration();
 
             moAction = new MOAction(pluginInterface.TargetModuleScanner, pluginInterface.ClientState, Configuration, ref pluginInterface, rawActions);
 
             TargetTypes = new List<TargetType>();
-            TargetTypes.Add(new ActorTarget(moAction.GetRegTargPtr));
-            TargetTypes.Add(new EntityTarget(moAction.GetFocusPtr));
             TargetTypes.Add(new EntityTarget(moAction.GetGuiMoPtr));
             TargetTypes.Add(new ActorTarget(moAction.GetFieldMoPtr));
+            TargetTypes.Add(new ActorTarget(moAction.GetRegTargPtr));
+            TargetTypes.Add(new EntityTarget(moAction.GetFocusPtr));
+            
+            
 
             moAction.Enable();
             SetNewConfig();
@@ -125,7 +129,7 @@ namespace MOAction
                 var elem = Stacks[i];
                 var currentSettings = StackFlags.ElementAt(i);
 
-                if (!currentSettings.isOpen)
+                if (!currentSettings.notDeleted)
                 {
                     StackFlags.RemoveAt(i);
                     Stacks.RemoveAt(i);
@@ -135,7 +139,8 @@ namespace MOAction
 
                 var jobname = "";
                 if (currentSettings.jobs >= 0) jobname = " - " + soloJobNames[currentSettings.jobs];
-                if (ImGui.CollapsingHeader(GetName(elem.key) + jobname +"###"+i, ref StackFlags[i].isOpen))
+                ImGui.SetNextItemOpen(StackFlags[i].isOpen);
+                if (StackFlags[i].isOpen = ImGui.CollapsingHeader(GetName(elem.key) + jobname +"###"+i, ref StackFlags[i].notDeleted, ImGuiTreeNodeFlags.DefaultOpen))
                 {
                     
                     ImGui.PushItemWidth(70);
@@ -168,8 +173,14 @@ namespace MOAction
                     StackFlags[i].lastJob = StackFlags[i].jobs;
                     ImGui.PushItemWidth(200);
                     ImGui.Combo("Base Ability##"+i, ref StackFlags[i].baseAbility, actionNames, actions.Count);
+                    
+
                     var tmptargs = StackFlags[i].stackTargets.ToArray();
                     var tmpabilities = StackFlags[i].stackAbilities.ToArray();
+                    for (int j = 0; j < tmpabilities.Length; j++) {
+                        if (StackFlags[i].baseAbility != -1 && tmpabilities[j] == -1)
+                            tmpabilities[j] = StackFlags[i].baseAbility;
+                    }
                     ImGui.Indent();
                     for (int j = 0; j < Stacks[i].value.Count; j++) {
                         ImGui.Text("Ability #" + (j + 1));
@@ -231,7 +242,7 @@ namespace MOAction
                     ImGui.Unindent();
                 }
             }
-            
+            ImGui.Separator();
             if (ImGui.Button("Add stack"))
             {
                 if (StackFlags.Count == 0 || StackFlags.Last().jobs != -1)
@@ -246,8 +257,8 @@ namespace MOAction
                     List<int> tmp1 = new List<int>(1);
                     List<int> tmp2 = new List<int>(1);
                     tmp1.Add(-1);
-                    tmp2.Add(-1);
-                    StackFlags.Add(new GuiSettings(true, -1, -1, -1, tmp1, tmp2));
+                    tmp2.Add(0);
+                    StackFlags.Add(new GuiSettings(true, true, -1, -1, -1, tmp1, tmp2));
                 }
             }
 
@@ -257,45 +268,57 @@ namespace MOAction
 
             ImGui.Separator();
 
+            if (ImGui.Button("Save"))
+            {
+                Save();
+            }
+            ImGui.SameLine();
+
             if (ImGui.Button("Save and Close"))
             {
                 isImguiMoSetupOpen = false;
-                for (var i = 0; i < StackFlags.Count; i++)
-                { 
-                    //var stack = Stacks[i];
-
-                    for(var j = 0; j < StackFlags[i].stackAbilities.Count; j++)
-                    {
-                        if (StackFlags[i].stackAbilities[j] == -1 || StackFlags[i].stackTargets[j] == -1)
-                        {
-                            StackFlags[i].stackAbilities.RemoveAt(j);
-                            StackFlags[i].stackTargets.RemoveAt(j);
-                            j--;
-                        }
-                    }
-                    if (StackFlags[i].stackAbilities.Count == 0)
-                    {
-                        StackFlags.RemoveAt(i);
-                        i--;
-                    }
-
-                    /*
-                    if (stack.value[0].actionID > 0)
-                        moAction.Stacks[stack.key] = stack.value;
-                        */
-                }
-                UpdateConfig();
-                pluginInterface.SavePluginConfig(Configuration);
-
-                SetNewConfig();
+                Save();
             }
 
             ImGui.Spacing();
             ImGui.End();
         }
 
+        private void Save()
+        {
+            for (var i = 0; i < StackFlags.Count; i++)
+            {
+                //var stack = Stacks[i];
+
+                for (var j = 0; j < StackFlags[i].stackAbilities.Count; j++)
+                {
+                    if (StackFlags[i].stackAbilities[j] == -1 || StackFlags[i].stackTargets[j] == -1)
+                    {
+                        StackFlags[i].stackAbilities.RemoveAt(j);
+                        StackFlags[i].stackTargets.RemoveAt(j);
+                        j--;
+                    }
+                }
+                if (StackFlags[i].stackAbilities.Count == 0)
+                {
+                    StackFlags.RemoveAt(i);
+                    i--;
+                }
+
+                /*
+                if (stack.value[0].actionID > 0)
+                    moAction.Stacks[stack.key] = stack.value;
+                    */
+            }
+            UpdateConfig();
+            pluginInterface.SavePluginConfig(Configuration);
+
+            SetNewConfig();
+        }
+
         private void UpdateConfig()
         {
+            Configuration.Version = CURRENT_CONFIG_VERSION;
             Configuration.SetStackFlags(StackFlags);
             Configuration.SetStacks(Stacks);
         }
@@ -339,7 +362,7 @@ namespace MOAction
         private String GetName(uint actionID)
         {
             if (actionID == 0) return "Unset Action";
-            return applicableActions.Single(elem => elem.ID == actionID).AbilityName;
+            return applicableActions.First(elem => elem.ID == actionID).AbilityName;
         }
 
         private string ClassJobCategoryToName(byte key)

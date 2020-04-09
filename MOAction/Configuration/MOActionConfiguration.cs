@@ -13,6 +13,7 @@ namespace MOAction
     public class MOActionConfiguration : IPluginConfiguration
     {
         //public List<(uint, List<StackEntry>)> Stacks { get; private set; }
+        public int Version { get; set; } = 0;
         public List<GuiSettings> StackFlags { get; private set; }
         int IPluginConfiguration.Version { get; set; }
 

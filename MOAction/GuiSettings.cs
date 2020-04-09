@@ -9,20 +9,22 @@ namespace MOAction
     public class GuiSettings
     {
         public bool isOpen;
+        public bool notDeleted;
         public int jobs;
         public int lastJob;
         public int baseAbility;
         public List<int> stackAbilities;
         public List<int> stackTargets;
 
-        public GuiSettings(bool open, int job, int lastjob, int baseabil) : 
-            this(open, job, lastjob, baseabil, new List<int>(), new List<int>())
+        public GuiSettings(bool open, bool del, int job, int lastjob, int baseabil) : 
+            this(open, del, job, lastjob, baseabil, new List<int>(), new List<int>())
         {
         }
 
-        public GuiSettings(bool open, int job, int lastjob, int baseabil, List<int> stackabil, List<int> stacktarg)
+        public GuiSettings(bool open, bool notdel, int job, int lastjob, int baseabil, List<int> stackabil, List<int> stacktarg)
         {
             isOpen = open;
+            notDeleted = notdel;
             jobs = job;
             lastJob = lastjob;
             baseAbility = baseabil;
@@ -31,7 +33,7 @@ namespace MOAction
         }
 
         public GuiSettings() :
-            this(true, -1, -1, -1, new List<int>(), new List<int>())
+            this(true, true, -1, -1, -1, new List<int>(), new List<int>())
         { }
     }
 }
