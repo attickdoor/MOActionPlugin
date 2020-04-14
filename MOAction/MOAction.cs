@@ -84,6 +84,7 @@ namespace MOAction
 
         private void HandleUiMoEntityId(long param1, long param2)
         {
+            Log.Information("UI MO: {0}", param2);
             uiMoEntityId = (IntPtr)param2;
             uiMoEntityIdHook.Original(param1, param2);
         }
@@ -122,11 +123,15 @@ namespace MOAction
                 var a = this.pluginInterface.ClientState.Actors[i];
                 if (a.ActorId == targ.target.GetTargetActorId())
                 {
-                    if (a is PlayerCharacter) return action.CanTargetFriendly || action.CanTargetParty || action.RowId == 17055 || action.RowId == 7443;
+                    if (a is PlayerCharacter) return action.CanTargetFriendly || action.CanTargetParty 
+                            || action.CanTargetSelf
+                            || action.RowId == 17055 || action.RowId == 7443;
                     if (a is BattleNpc)
                     {
                         BattleNpc b = (BattleNpc)a;
-                        if (b.BattleNpcKind != BattleNpcSubKind.Enemy) return action.CanTargetFriendly || action.CanTargetParty || action.RowId == 17055 || action.RowId == 7443;
+                        if (b.BattleNpcKind != BattleNpcSubKind.Enemy) return action.CanTargetFriendly || action.CanTargetParty
+                                || action.CanTargetSelf
+                                || action.RowId == 17055 || action.RowId == 7443;
                     }
                     return action.CanTargetHostile;
                 }

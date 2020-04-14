@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace MOAction
 {
-    public class ApplicableAction
+    public class ApplicableAction : IEquatable<ApplicableAction>
     {
         public uint ID { set; get; }
         public string AbilityName { set; get; }
@@ -29,6 +29,16 @@ namespace MOAction
             CanTargetHostile = targenemy;
             ClassJobCategory = cjc;
             IsPvP = ispvp;
+        }
+
+        public ApplicableAction(uint id) :
+            this(id, null, false, false, false, false, false, 0, false)
+        { }
+
+        public bool Equals(ApplicableAction other)
+        {
+            if (other == null) return false;
+            return this.ID.Equals(other.ID);
         }
     }
 }
