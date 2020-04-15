@@ -84,7 +84,7 @@ namespace MOAction
 
         private void HandleUiMoEntityId(long param1, long param2)
         {
-            Log.Information("UI MO: {0}", param2);
+            //Log.Information("UI MO: {0}", param2);
             uiMoEntityId = (IntPtr)param2;
             uiMoEntityIdHook.Original(param1, param2);
         }
