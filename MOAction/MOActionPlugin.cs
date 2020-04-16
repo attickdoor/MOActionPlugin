@@ -47,7 +47,7 @@ namespace MOAction
 
         private bool isImguiMoSetupOpen = false;
 
-        private readonly int CURRENT_CONFIG_VERSION = 3;
+        private readonly int CURRENT_CONFIG_VERSION = 4;
 
         public void Initialize(DalamudPluginInterface pluginInterface)
         {
@@ -83,29 +83,61 @@ namespace MOAction
             var rawActions = pluginInterface.Data.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>().GetRows().Where(row => row.IsPlayerAction);
             foreach (Lumina.Excel.GeneratedSheets.Action a in rawActions)
             {
-                applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, a.CanTargetHostile, a.ClassJobCategory, a.IsPvP));
-                oldActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, a.CanTargetHostile, a.ClassJobCategory, a.IsPvP));
+                if (a.RowId == 3575)
+                    applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, true, a.ClassJobCategory, a.IsPvP));
+                else if (a.RowId == 17055 || a.RowId == 7443)
+                    applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, true, true, a.CanTargetFriendly, a.CanTargetHostile, a.ClassJobCategory, a.IsPvP));
+                else
+                    applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, a.CanTargetHostile, a.ClassJobCategory, a.IsPvP));
             }
             SortActions();
             oldActions.Remove(new ApplicableAction(173));
             var config = pluginInterface.GetPluginConfig() as MOActionConfiguration ?? new MOActionConfiguration();
             
-            if (config.Version < CURRENT_CONFIG_VERSION)
+            // big upgrade for old moaction config
+            if (config.Version < 3)
             {
                 config.SetOldFlags(new bool[oldActions.Count]);
 
                 if (config.StackFlags == null)
                     config.SetStackFlags(new List<GuiSettings>());
 
-                config.Version = CURRENT_CONFIG_VERSION;
+                config.Version = 3;
 
                 for (int i = 0; i < config.StackFlags.Count; i++)
                 {
                     config.StackFlags[i].refjob = config.StackFlags[i].jobs;
+                    if (config.StackFlags[i].jobs == 4)
+                    {
+                        if (config.StackFlags[i].baseAbility >= 11)
+                            config.StackFlags[i].baseAbility++;
+                        for (var j = 0; j < config.StackFlags[i].stackAbilities.Count; j++)
+                        {
+                            if (config.StackFlags[i].stackAbilities[j] >= 11)
+                                config.StackFlags[i].stackAbilities[j]++;
+                        }
+                    }
                 }
                 for (int i = 0; i < config.OldFlags.Length; i++)
                     config.OldFlags[i] = false;
-
+            }
+            // Upgrade blm stacks to contain enochian
+            if (config.Version < 4)
+            {
+                config.Version = 4;
+                for (int i = 0; i < config.StackFlags.Count; i++)
+                {
+                    if (config.StackFlags[i].jobs == 4)
+                    {
+                        if (config.StackFlags[i].baseAbility >= 11)
+                            config.StackFlags[i].baseAbility++;
+                        for (var j = 0; j < config.StackFlags[i].stackAbilities.Count; j++)
+                        {
+                            if (config.StackFlags[i].stackAbilities[j] >= 11)
+                                config.StackFlags[i].stackAbilities[j]++;
+                        }
+                    }
+                }
             }
 
             Configuration = config as MOActionConfiguration;
@@ -149,6 +181,7 @@ namespace MOAction
                 DrawNewConfig();           
         }
 
+        #region OldGui
         private void DrawOldConfig()
         {
             ImGui.SetNextWindowSize(new Vector2(740, 490));
@@ -190,7 +223,7 @@ namespace MOAction
                                     {
                                         break;
                                     }
-                                    if ((action.CanTargetParty && !action.IsPvP && !action.IsRoleAction) || action.ID == 17055 || action.ID == 7443)
+                                    if (action.CanTargetParty && !action.IsPvP && !action.IsRoleAction)
                                     {
                                         ImGui.Indent();
                                         ImGui.Checkbox(action.AbilityName, ref flagsSelected[j]);
@@ -328,7 +361,9 @@ namespace MOAction
             ImGui.Spacing();
             ImGui.End();
         }
+        #endregion OldGui
 
+        #region NewGui
         private void DrawNewConfig()
         {
             ImGui.Begin("Action stack setup", ref isImguiMoSetupOpen,
@@ -338,7 +373,7 @@ namespace MOAction
             ImGui.SameLine();
             if (ImGui.Button("\"This video\""))
             {
-                System.Diagnostics.Process.Start("https://youtu.be/pm4eCxD90gs");
+                Process.Start("https://youtu.be/pm4eCxD90gs");
             }
             ImGui.Separator();
             ImGui.BeginChild("scrolling", new Vector2(0, ImGui.GetWindowSize().Y - 125), true, ImGuiWindowFlags.NoScrollbar);
@@ -609,7 +644,7 @@ namespace MOAction
             ImGui.Spacing();
             ImGui.End();
         }
-
+        #endregion NewGui
         private void StackUpdateAndSave()
         {
             SaveNew();
@@ -878,8 +913,7 @@ namespace MOAction
                         Where(item => ClassJobCategoryToName(item.ClassJobCategory).
                                         Contains(soloJobNames[index]) &&
                                         !item.IsPvP &&
-                                        (item.CanTargetParty || item.CanTargetHostile
-                                        || item.ID == 17055 || item.ID == 7443)).
+                                        (item.CanTargetParty || item.CanTargetHostile)).
                         ToList();
             }
             return new List<ApplicableAction>();
@@ -909,8 +943,8 @@ namespace MOAction
             oldActions.Clear();
             foreach (ApplicableAction elem in tmp)
             {
-                applicableActions.Add(elem);
                 oldActions.Add(elem);
+                applicableActions.Add(elem);
             }
         }
     }

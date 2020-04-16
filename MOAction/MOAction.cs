@@ -38,6 +38,8 @@ namespace MOAction
         public IntPtr focusTargLocation;
         public IntPtr regularTargLocation;
         public IntPtr uiMoEntityId = IntPtr.Zero;
+        private HashSet<uint> UnorthodoxFriendly;
+        private HashSet<uint> UnorthodoxHostile;
 
         public HashSet<ulong> enabledActions;
 
@@ -68,6 +70,11 @@ namespace MOAction
             uiMoEntityIdHook = new Hook<OnSetUiMouseoverEntityId>(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId), this);
 
             enabledActions = new HashSet<ulong>();
+            UnorthodoxFriendly = new HashSet<uint>();
+            UnorthodoxHostile = new HashSet<uint>();
+            UnorthodoxHostile.Add(3575);
+            UnorthodoxFriendly.Add(17055);
+            UnorthodoxFriendly.Add(7443);
         }
 
         public void Enable()
@@ -131,9 +138,9 @@ namespace MOAction
                         BattleNpc b = (BattleNpc)a;
                         if (b.BattleNpcKind != BattleNpcSubKind.Enemy) return action.CanTargetFriendly || action.CanTargetParty
                                 || action.CanTargetSelf
-                                || action.RowId == 17055 || action.RowId == 7443;
+                                || UnorthodoxFriendly.Contains((uint)action.RowId);
                     }
-                    return action.CanTargetHostile;
+                    return action.CanTargetHostile || UnorthodoxHostile.Contains((uint)action.RowId);
                 }
             }
             return false;
