@@ -128,7 +128,7 @@ namespace MOAction
             for (var i = 0; i < this.pluginInterface.ClientState.Actors.Length; i++)
             {
                 var a = this.pluginInterface.ClientState.Actors[i];
-                if (a.ActorId == targ.target.GetTargetActorId())
+                if (a != null && a.ActorId == targ.target.GetTargetActorId())
                 {
                     if (a is PlayerCharacter) return action.CanTargetFriendly || action.CanTargetParty 
                             || action.CanTargetSelf
