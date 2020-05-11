@@ -21,6 +21,7 @@ namespace MOAction
         public bool[] OldFlags { get; set; }
         public bool oldMO { get; set; }
         public bool oldField { get; set; }
+        public bool RangeCheck { get; set; }
 
         public MOActionConfiguration()
         {
@@ -56,6 +57,10 @@ namespace MOAction
         public void SetOldField(bool old)
         {
             oldField = old;
+        }
+        public void SetRangeCheck(bool range)
+        {
+            RangeCheck = range;
         }
     }
 }

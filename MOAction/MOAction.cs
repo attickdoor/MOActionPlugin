@@ -130,6 +130,8 @@ namespace MOAction
                 var a = this.pluginInterface.ClientState.Actors[i];
                 if (a != null && a.ActorId == targ.target.GetTargetActorId())
                 {
+                    if (Configuration.RangeCheck)
+                        if (action.Range < a.YalmDistanceX) return false;
                     if (a is PlayerCharacter) return action.CanTargetFriendly || action.CanTargetParty 
                             || action.CanTargetSelf
                             || action.RowId == 17055 || action.RowId == 7443;
@@ -161,6 +163,13 @@ namespace MOAction
         public IntPtr GetRegTargPtr()
         {
             return regularTargLocation;
+        }
+
+        public IntPtr GetPartyMember(int pos)
+        {
+            var member = pluginInterface.ClientState.PartyList[pos];
+            if (member == null || member.Actor == null) return IntPtr.Zero;
+            return member.Actor.Address;
         }
 
     }

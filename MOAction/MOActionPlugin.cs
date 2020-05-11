@@ -31,7 +31,7 @@ namespace MOAction
         private List<ApplicableAction> applicableActions;
         private List<(uint key, List<StackEntry> value)> Stacks;
         private List<TargetType> TargetTypes;
-        private readonly string[] tTypeNames = { "UI Mouseover", "Field Mouseover", "Regular Target", "Focus Target" };
+        private readonly string[] tTypeNames = { "UI Mouseover", "Field Mouseover", "Regular Target", "Focus Target", "Myself", "<2>", "<3>", "<4>", "<5>", "<6>", "<7>", "<8>" };
         private List<GuiSettings> SortedStackFlags;
         private List<GuiSettings> UnsortedStackFlags;
         List<ApplicableAction> actions;
@@ -41,6 +41,7 @@ namespace MOAction
         private bool[] flagsSelected;
         private bool UIMOEnabled;
         private bool FieldMOEnabled;
+        private bool rangeCheck;
 
         private readonly string[] soloJobNames = { "AST", "WHM", "SCH", "SMN", "BLM", "RDM", "BLU", "BRD", "MCH", "DNC", "DRK", "GNB", "WAR", "PLD", "DRG", "MNK", "SAM", "NIN" };
         private readonly string[] roleActionNames = { "BLM SMN RDM BLU", "BRD MCH DNC",  "MNK DRG NIN SAM", "PLD WAR DRK GNB", "WHM SCH AST"};
@@ -146,6 +147,7 @@ namespace MOAction
             UIMOEnabled = Configuration.oldMO;
             FieldMOEnabled = Configuration.oldField;
             SortedStackFlags = Configuration.StackFlags;
+            rangeCheck = Configuration.RangeCheck;
             moAction = new MOAction(pluginInterface.TargetModuleScanner, pluginInterface.ClientState, Configuration, ref pluginInterface, rawActions);
 
             TargetTypes = new List<TargetType>();
@@ -153,6 +155,14 @@ namespace MOAction
             TargetTypes.Add(new ActorTarget(moAction.GetFieldMoPtr));
             TargetTypes.Add(new ActorTarget(moAction.GetRegTargPtr));
             TargetTypes.Add(new EntityTarget(moAction.GetFocusPtr));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(0)));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(1)));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(2)));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(3)));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(4)));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(5)));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(6)));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(7)));
 
             flagsSelected = Configuration.OldFlags;
 
@@ -369,12 +379,7 @@ namespace MOAction
             ImGui.Begin("Action stack setup", ref isImguiMoSetupOpen,
                 ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar);
             ImGui.Text("This window allows you to set up your action stacks.");
-            ImGui.Text("YOU SHOULD PROBABLY WATCH THIS VIDEO FOR THE 2.0 UPDATE: ");
-            ImGui.SameLine();
-            if (ImGui.Button("\"This video\""))
-            {
-                Process.Start("https://youtu.be/pm4eCxD90gs");
-            }
+            ImGui.Checkbox("Stack entry fails if target is out of range.", ref rangeCheck);
             ImGui.Separator();
             ImGui.BeginChild("scrolling", new Vector2(0, ImGui.GetWindowSize().Y - 125), true, ImGuiWindowFlags.NoScrollbar);
             string jobname = "";
@@ -719,6 +724,7 @@ namespace MOAction
             Configuration.SetWindowVersion(OldConfig);
             Configuration.SetOldField(FieldMOEnabled);
             Configuration.SetOldMO(UIMOEnabled);
+            Configuration.SetRangeCheck(rangeCheck);
             pluginInterface.SavePluginConfig(Configuration);
         }
 
