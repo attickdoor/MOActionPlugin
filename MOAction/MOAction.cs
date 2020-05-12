@@ -21,10 +21,13 @@ namespace MOAction
         public delegate ulong OnRequestActionDetour(long param_1, uint param_2, ulong param_3, long param_4,
                        uint param_5, uint param_6, int param_7);
 
+        [UnmanagedFunctionPointer(CallingConvention.ThisCall, CharSet = CharSet.Ansi)]
+        private delegate ulong ResolvePlaceholderActor(long param1, string param2, byte param3, byte param4);
+        private ResolvePlaceholderActor PlaceholderResolver;
+
         public delegate void OnSetUiMouseoverEntityId(long param1, long param2);
 
         private readonly MOActionAddressResolver Address;
-
         private readonly MOActionConfiguration Configuration;
 
         private Hook<OnRequestActionDetour> requestActionHook;
@@ -38,6 +41,8 @@ namespace MOAction
         public IntPtr focusTargLocation;
         public IntPtr regularTargLocation;
         public IntPtr uiMoEntityId = IntPtr.Zero;
+        public IntPtr MagicStructInfo = IntPtr.Zero;
+        private IntPtr MagicUiObject;
         private HashSet<uint> UnorthodoxFriendly;
         private HashSet<uint> UnorthodoxHostile;
 
@@ -51,6 +56,8 @@ namespace MOAction
             fieldMOLocation = scanner.GetStaticAddressFromSig("E8 ?? ?? ?? ?? 83 BF ?? ?? ?? ?? ?? 0F 84 ?? ?? ?? ?? 48 8D 4C 24 ??", 0x28E);
             focusTargLocation = scanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 48 89 5C 24 ?? BB ?? ?? ?? ?? 48 89 7C 24 ??", 0);
             regularTargLocation = scanner.GetStaticAddressFromSig("F3 0F 11 05 ?? ?? ?? ?? EB 27", 0) + 0x4;
+            MagicStructInfo = scanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 48 8D 05 ?? ?? ?? ?? 48 89 05 ?? ?? ?? ?? 48 85 C9 74 0C", 0);
+            
 
             Configuration = configuration;
 
@@ -68,6 +75,8 @@ namespace MOAction
 
             requestActionHook = new Hook<OnRequestActionDetour>(Address.RequestAction, new OnRequestActionDetour(HandleRequestAction), this);
             uiMoEntityIdHook = new Hook<OnSetUiMouseoverEntityId>(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId), this);
+            PlaceholderResolver = Marshal.GetDelegateForFunctionPointer<ResolvePlaceholderActor>(Address.ResolvePlaceholderText);
+            MagicUiObject = IntPtr.Zero;
 
             enabledActions = new HashSet<ulong>();
             UnorthodoxFriendly = new HashSet<uint>();
@@ -171,6 +180,26 @@ namespace MOAction
             if (member == null || member.Actor == null) return IntPtr.Zero;
             return member.Actor.Address;
         }
+        public void SetupPlaceholderResolver()
+        {
+            while (MagicUiObject == IntPtr.Zero)
+            {
+                try
+                {
+                    IntPtr step2 = Marshal.ReadIntPtr(MagicStructInfo) + 8;
+                    MagicUiObject = Marshal.ReadIntPtr(step2) + 0xe780;
+                }
+                catch(Exception e)
+                {
+                    MagicUiObject = IntPtr.Zero;
+                    continue;
+                }
+            }
+        }
 
+        public IntPtr GetActorFromPlaceholder(string placeholder)
+        {
+            return (IntPtr)PlaceholderResolver((long)MagicUiObject, placeholder, 1, 0);
+        }
     }
 }

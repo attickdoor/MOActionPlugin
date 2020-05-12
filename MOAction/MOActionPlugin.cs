@@ -31,7 +31,7 @@ namespace MOAction
         private List<ApplicableAction> applicableActions;
         private List<(uint key, List<StackEntry> value)> Stacks;
         private List<TargetType> TargetTypes;
-        private readonly string[] tTypeNames = { "UI Mouseover", "Field Mouseover", "Regular Target", "Focus Target", "Myself", "<2>", "<3>", "<4>", "<5>", "<6>", "<7>", "<8>" };
+        private readonly string[] tTypeNames = { "UI Mouseover", "Field Mouseover", "Regular Target", "Focus Target", "Target of Target", "Myself", "<2>", "<3>", "<4>", "<5>", "<6>", "<7>", "<8>" };
         private List<GuiSettings> SortedStackFlags;
         private List<GuiSettings> UnsortedStackFlags;
         List<ApplicableAction> actions;
@@ -141,6 +141,19 @@ namespace MOAction
                 }
             }
 
+            if (config.Version < 5)
+            {
+                config.Version = 5;
+                for (var i = 0; i < config.StackFlags.Count; i++)
+                {
+                    for (var j = 0; j < config.StackFlags[i].stackTargets.Count; j++)
+                    {
+                        if (config.StackFlags[i].stackTargets[j] > 3)
+                            config.StackFlags[i].stackTargets[j]++;
+                    }
+                }
+            }
+
             Configuration = config as MOActionConfiguration;
 
             OldConfig = Configuration.OldConfigActive;
@@ -150,19 +163,22 @@ namespace MOAction
             rangeCheck = Configuration.RangeCheck;
             moAction = new MOAction(pluginInterface.TargetModuleScanner, pluginInterface.ClientState, Configuration, ref pluginInterface, rawActions);
 
+            moAction.SetupPlaceholderResolver();
+
             TargetTypes = new List<TargetType>();
             TargetTypes.Add(new EntityTarget(moAction.GetGuiMoPtr));
             TargetTypes.Add(new ActorTarget(moAction.GetFieldMoPtr));
             TargetTypes.Add(new ActorTarget(moAction.GetRegTargPtr));
-            TargetTypes.Add(new EntityTarget(moAction.GetFocusPtr));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<f>")));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<tt>")));
             TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(0)));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(1)));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(2)));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(3)));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(4)));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(5)));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(6)));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(7)));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<2>")));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<3>")));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<4>")));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<5>")));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<6>")));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<7>")));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<8>")));
 
             flagsSelected = Configuration.OldFlags;
 
