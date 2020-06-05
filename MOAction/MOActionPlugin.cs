@@ -2,20 +2,13 @@
 using Dalamud.Plugin;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Numerics;
-using System.Runtime.Remoting.Messaging;
-using Dalamud.Game.Chat;
 using ImGuiNET;
-using Serilog;
-using Lumina;
 using System.Threading.Tasks;
 using System.Threading;
 using MOAction.Target;
 using MOAction.Configuration;
-using Dalamud.Plugin;
 
 namespace MOAction
 {
@@ -48,7 +41,7 @@ namespace MOAction
 
         private bool isImguiMoSetupOpen = false;
 
-        private readonly int CURRENT_CONFIG_VERSION = 4;
+        private readonly int CURRENT_CONFIG_VERSION = 5;
 
         public void Initialize(DalamudPluginInterface pluginInterface)
         {
@@ -537,12 +530,12 @@ namespace MOAction
                 var abilityName = "";
                 if (currentSettings.baseAbility == -1) abilityName = "Unset Ability";
                 else abilityName = actionNames[currentSettings.baseAbility];
-                if (UnsortedStackFlags[i].isOpen = ImGui.CollapsingHeader(abilityName + "###" + i, ref UnsortedStackFlags[i].notDeleted, ImGuiTreeNodeFlags.DefaultOpen))
+                if (UnsortedStackFlags[i].isOpen = ImGui.CollapsingHeader(abilityName + "###Unsorted" + i, ref UnsortedStackFlags[i].notDeleted, ImGuiTreeNodeFlags.DefaultOpen))
                 {
 
                     ImGui.PushItemWidth(70);
 
-                    ImGui.Combo("Job##" + i, ref UnsortedStackFlags[i].jobs, soloJobNames, soloJobNames.Length);
+                    ImGui.Combo("Job##Unsorted" + i, ref UnsortedStackFlags[i].jobs, soloJobNames, soloJobNames.Length);
                     ImGui.PopItemWidth();
 
                     ImGui.Indent();
@@ -570,7 +563,7 @@ namespace MOAction
                     }
                     UnsortedStackFlags[i].lastJob = UnsortedStackFlags[i].jobs;
                     ImGui.PushItemWidth(200);
-                    ImGui.Combo("Base Ability##" + i, ref UnsortedStackFlags[i].baseAbility, actionNames, actions.Count);
+                    ImGui.Combo("Base Ability##Unsorted" + i, ref UnsortedStackFlags[i].baseAbility, actionNames, actions.Count);
 
 
                     var tmptargs = UnsortedStackFlags[i].stackTargets.ToArray();
@@ -586,12 +579,12 @@ namespace MOAction
                     for (int j = 0; j < UnsortedStackFlags[i].stackAbilities.Count; j++)
                     {
                         ImGui.Text("Ability #" + (j + 1));
-                        ImGui.Combo("Target##" + i.ToString() + j.ToString(), ref tmptargs[j], tTypeNames, TargetTypes.Count);
+                        ImGui.Combo("Target##Unsorted" + i.ToString() + j.ToString(), ref tmptargs[j], tTypeNames, TargetTypes.Count);
                         ImGui.SameLine(0, 35);
-                        ImGui.Combo("Ability##" + i.ToString() + j.ToString(), ref tmpabilities[j], actionNames, actions.Count);
+                        ImGui.Combo("Ability##Unsorted" + i.ToString() + j.ToString(), ref tmpabilities[j], actionNames, actions.Count);
 
                         if (tmptargs.Length != 1) ImGui.SameLine(0, 10);
-                        if (tmptargs.Length != 1 && ImGui.Button("Delete Ability##" + i.ToString() + j.ToString()))
+                        if (tmptargs.Length != 1 && ImGui.Button("Delete Ability##Unsorted" + i.ToString() + j.ToString()))
                         {
                             UnsortedStackFlags[i].stackAbilities.RemoveAt(j);
                             UnsortedStackFlags[i].stackTargets.RemoveAt(j);
@@ -605,7 +598,7 @@ namespace MOAction
                     UnsortedStackFlags[i].stackTargets = tmptargs.ToList();
                     UnsortedStackFlags[i].stackAbilities = tmpabilities.ToList();
                     
-                    if (ImGui.Button("Add action to bottom of stack##" + i))
+                    if (ImGui.Button("Add action to bottom of stack##Unsorted" + i))
                     {
                         if (UnsortedStackFlags[i].stackAbilities.Last() != -1)
                         {

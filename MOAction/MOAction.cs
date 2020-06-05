@@ -1,18 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Dalamud.Game;
 using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Actors.Types;
 using Dalamud.Game.ClientState.Actors.Types.NonPlayer;
-using Dalamud.Game.ClientState.Structs.JobGauge;
 using Dalamud.Hooking;
 using Dalamud.Plugin;
 using MOAction.Configuration;
-using MOAction.Target;
-using Serilog;
 
 namespace MOAction
 {
@@ -69,9 +65,9 @@ namespace MOAction
 
             Stacks = new Dictionary<uint, List<StackEntry>>();
 
-            Log.Verbose("===== M O A C T I O N =====");
-            Log.Verbose("RequestAction address {IsIconReplaceable}", Address.RequestAction);
-            Log.Verbose("SetUiMouseoverEntityId address {SetUiMouseoverEntityId}", Address.SetUiMouseoverEntityId);
+            PluginLog.Log("===== M O A C T I O N =====");
+            PluginLog.Log("RequestAction address {IsIconReplaceable}", Address.RequestAction);
+            PluginLog.Log("SetUiMouseoverEntityId address {SetUiMouseoverEntityId}", Address.SetUiMouseoverEntityId);
 
             requestActionHook = new Hook<OnRequestActionDetour>(Address.RequestAction, new OnRequestActionDetour(HandleRequestAction), this);
             uiMoEntityIdHook = new Hook<OnSetUiMouseoverEntityId>(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId), this);
@@ -105,10 +101,9 @@ namespace MOAction
             uiMoEntityIdHook.Original(param1, param2);
         }
 
-        private unsafe ulong HandleRequestAction(long param_1, uint param_2, ulong param_3, long param_4,
+        private ulong HandleRequestAction(long param_1, uint param_2, ulong param_3, long param_4,
                        uint param_5, uint param_6, int param_7)
         {
-            Log.Verbose($"RequestAction: {param_3} {param_4}");
             var (action, target) = GetActionTarget((uint)param_3);
             if (action != 0 && target != 0)
                 return this.requestActionHook.Original(param_1, param_2, action, target, param_5, param_6, param_7);
@@ -140,7 +135,13 @@ namespace MOAction
                 if (a != null && a.ActorId == targ.target.GetTargetActorId())
                 {
                     if (Configuration.RangeCheck)
-                        if (action.Range < a.YalmDistanceX) return false;
+                    {
+                        if (UnorthodoxFriendly.Contains((uint)action.RowId))
+                        {
+                            if (a.YalmDistanceX > 30) return false;
+                        }
+                        else if (action.Range < a.YalmDistanceX) return false;
+                    }
                     if (a is PlayerCharacter) return action.CanTargetFriendly || action.CanTargetParty 
                             || action.CanTargetSelf
                             || action.RowId == 17055 || action.RowId == 7443;
