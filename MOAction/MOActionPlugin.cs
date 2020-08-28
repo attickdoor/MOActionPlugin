@@ -74,15 +74,15 @@ namespace MOAction
 
         private void InitializeData()
         {
-            var rawActions = pluginInterface.Data.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>().GetRows().Where(row => row.IsPlayerAction);
+            var rawActions = pluginInterface.Data.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>().Where(row => row.IsPlayerAction);
             foreach (Lumina.Excel.GeneratedSheets.Action a in rawActions)
             {
                 if (a.RowId == 3575)
-                    applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, true, a.ClassJobCategory, a.IsPvP));
+                    applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, true, (byte)a.ClassJobCategory.Row, a.IsPvP));
                 else if (a.RowId == 17055 || a.RowId == 7443)
-                    applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, true, true, a.CanTargetFriendly, a.CanTargetHostile, a.ClassJobCategory, a.IsPvP));
+                    applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, true, true, a.CanTargetFriendly, a.CanTargetHostile, (byte)a.ClassJobCategory.Row, a.IsPvP));
                 else
-                    applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, a.CanTargetHostile, a.ClassJobCategory, a.IsPvP));
+                    applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, a.CanTargetHostile, (byte)a.ClassJobCategory.Row, a.IsPvP));
             }
             SortActions();
             oldActions.Remove(new ApplicableAction(173));
@@ -164,7 +164,7 @@ namespace MOAction
             TargetTypes.Add(new ActorTarget(moAction.GetRegTargPtr));
             TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<f>")));
             TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<tt>")));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetPartyMember(0)));
+            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<me>")));
             TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<2>")));
             TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<3>")));
             TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<4>")));

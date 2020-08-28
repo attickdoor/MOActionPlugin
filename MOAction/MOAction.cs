@@ -49,7 +49,7 @@ namespace MOAction
 
         public MOAction(SigScanner scanner, ClientState clientState, MOActionConfiguration configuration, ref DalamudPluginInterface plugin, IEnumerable<Lumina.Excel.GeneratedSheets.Action> rawActions)
         {
-            fieldMOLocation = scanner.GetStaticAddressFromSig("E8 ?? ?? ?? ?? 83 BF ?? ?? ?? ?? ?? 0F 84 ?? ?? ?? ?? 48 8D 4C 24 ??", 0x28E);
+            fieldMOLocation = scanner.GetStaticAddressFromSig("E8 ?? ?? ?? ?? 83 BF ?? ?? ?? ?? ?? 0F 84 ?? ?? ?? ?? 48 8D 4C 24 ??", 0x283);
             focusTargLocation = scanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 48 89 5C 24 ?? BB ?? ?? ?? ?? 48 89 7C 24 ??", 0);
             regularTargLocation = scanner.GetStaticAddressFromSig("F3 0F 11 05 ?? ?? ?? ?? EB 27", 0) + 0x4;
             MagicStructInfo = scanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 48 8D 05 ?? ?? ?? ?? 48 89 05 ?? ?? ?? ?? 48 85 C9 74 0C", 0);
@@ -140,7 +140,7 @@ namespace MOAction
                         {
                             if (a.YalmDistanceX > 30) return false;
                         }
-                        else if (action.Range < a.YalmDistanceX) return false;
+                        else if ((byte)action.Range < a.YalmDistanceX) return false;
                     }
                     if (a is PlayerCharacter) return action.CanTargetFriendly || action.CanTargetParty 
                             || action.CanTargetSelf
@@ -188,7 +188,7 @@ namespace MOAction
                 try
                 {
                     IntPtr step2 = Marshal.ReadIntPtr(MagicStructInfo) + 8;
-                    MagicUiObject = Marshal.ReadIntPtr(step2) + 0xe780;
+                    MagicUiObject = Marshal.ReadIntPtr(step2) + 0xe780 + 0x50;
                 }
                 catch(Exception e)
                 {
