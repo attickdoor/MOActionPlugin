@@ -203,7 +203,7 @@ namespace MOAction
         #region OldGui
         private void DrawOldConfig()
         {
-            ImGui.SetNextWindowSize(new Vector2(740, 490));
+            ImGui.SetNextWindowSize(new Vector2(740, 490), ImGuiCond.FirstUseEver);
 
             ImGui.Begin("MouseOver action setup", ref isImguiMoSetupOpen,
                 ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoScrollbar);
