@@ -62,11 +62,8 @@ namespace MOAction
 
             this.applicableActions = new List<ApplicableAction>();
             oldActions = new List<ApplicableAction>();
-            Task.Run(() =>
-            {
-                while (!this.pluginInterface.Data.IsDataReady) { Thread.Sleep(0); }
-                InitializeData();
-            });
+
+            InitializeData();
 
             this.pluginInterface.UiBuilder.OnOpenConfigUi += (sender, args) => isImguiMoSetupOpen = true;
             this.pluginInterface.UiBuilder.OnBuildUi += UiBuilder_OnBuildUi;
@@ -174,6 +171,11 @@ namespace MOAction
             TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<8>")));
 
             flagsSelected = Configuration.OldFlags;
+            if (flagsSelected.Count() < oldActions.Count()) {
+                bool[] newFlags = new bool[oldActions.Count()];
+                flagsSelected.CopyTo(newFlags, 0);
+                flagsSelected = newFlags;
+            }
 
             moAction.Enable();
             if (OldConfig) SetOldConfig();
@@ -740,7 +742,7 @@ namespace MOAction
         private void SetOldConfig()
         {
             moAction.Stacks.Clear();
-            for (int i = 0; i < oldActions.Count(); i++)
+            for (int i = 0; i < flagsSelected.Count(); i++)
             {
                 if (flagsSelected[i] == true)
                 {

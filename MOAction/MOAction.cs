@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using Dalamud.Game;
 using Dalamud.Game.ClientState;
@@ -14,12 +15,20 @@ namespace MOAction
 {
     public class MOAction
     {
-        public delegate ulong OnRequestActionDetour(long param_1, uint param_2, ulong param_3, long param_4,
+        public delegate bool OnRequestActionDetour(long param_1, uint param_2, ulong param_3, long param_4,
                        uint param_5, uint param_6, int param_7);
 
         [UnmanagedFunctionPointer(CallingConvention.ThisCall, CharSet = CharSet.Ansi)]
         private delegate ulong ResolvePlaceholderActor(long param1, string param2, byte param3, byte param4);
         private ResolvePlaceholderActor PlaceholderResolver;
+        private Hook<RequestActionLocationDelegate> reqlochook;
+
+        private delegate void PostRequest(IntPtr param1, long param2);
+        private PostRequest PostRequestResolver;
+
+        [return: MarshalAs(UnmanagedType.U1)]
+        public delegate bool RequestActionLocationDelegate(IntPtr actionMgr, uint type, uint id, uint targetId, ref Vector3 location, byte zero);
+        private RequestActionLocationDelegate RALDelegate;
 
         public delegate void OnSetUiMouseoverEntityId(long param1, long param2);
 
@@ -47,6 +56,8 @@ namespace MOAction
         public bool IsGuiMOEnabled = false;
         public bool IsFieldMOEnabled = false;
 
+        private IntPtr thing;
+
         public MOAction(SigScanner scanner, ClientState clientState, MOActionConfiguration configuration, ref DalamudPluginInterface plugin, IEnumerable<Lumina.Excel.GeneratedSheets.Action> rawActions)
         {
             fieldMOLocation = scanner.GetStaticAddressFromSig("E8 ?? ?? ?? ?? 83 BF ?? ?? ?? ?? ?? 0F 84 ?? ?? ?? ?? 48 8D 4C 24 ??", 0x283);
@@ -63,12 +74,17 @@ namespace MOAction
             pluginInterface = plugin;
             RawActions = rawActions;
 
+            RALDelegate = Marshal.GetDelegateForFunctionPointer<RequestActionLocationDelegate>(Address.RequestActionLocation);
+            PostRequestResolver = Marshal.GetDelegateForFunctionPointer<PostRequest>(Address.PostRequest);
+            thing = scanner.Module.BaseAddress + 0x1d8e490;
+
             Stacks = new Dictionary<uint, List<StackEntry>>();
 
             PluginLog.Log("===== M O A C T I O N =====");
             PluginLog.Log("RequestAction address {IsIconReplaceable}", Address.RequestAction);
             PluginLog.Log("SetUiMouseoverEntityId address {SetUiMouseoverEntityId}", Address.SetUiMouseoverEntityId);
 
+            reqlochook = new Hook<RequestActionLocationDelegate>(Address.RequestActionLocation, new RequestActionLocationDelegate(ReqLocDetour), this);
             requestActionHook = new Hook<OnRequestActionDetour>(Address.RequestAction, new OnRequestActionDetour(HandleRequestAction), this);
             uiMoEntityIdHook = new Hook<OnSetUiMouseoverEntityId>(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId), this);
             PlaceholderResolver = Marshal.GetDelegateForFunctionPointer<ResolvePlaceholderActor>(Address.ResolvePlaceholderText);
@@ -86,12 +102,14 @@ namespace MOAction
         {
             requestActionHook.Enable();
             uiMoEntityIdHook.Enable();
+            //reqlochook.Enable();
         }
 
         public void Dispose()
         {
             requestActionHook.Dispose();
             uiMoEntityIdHook.Dispose();
+            //reqlochook.Dispose();
         }
 
         private void HandleUiMoEntityId(long param1, long param2)
@@ -101,10 +119,36 @@ namespace MOAction
             uiMoEntityIdHook.Original(param1, param2);
         }
 
-        private ulong HandleRequestAction(long param_1, uint param_2, ulong param_3, long param_4,
+        private bool ReqLocDetour(IntPtr actionMgr, uint type, uint id, uint targetId, ref Vector3 location, byte zero)
+        {
+            PluginLog.Log($"args dump for Req loc detour: {type}, {id}, {targetId}, {location}");
+            return reqlochook.Original(actionMgr, type, id, targetId, ref location, zero);
+        }
+
+        private bool HandleRequestAction(long param_1, uint param_2, ulong param_3, long param_4,
                        uint param_5, uint param_6, int param_7)
         {
             var (action, target) = GetActionTarget((uint)param_3);
+            
+            if (param_3 == 7419)
+            {
+                
+                IntPtr self = (IntPtr)param_1;
+                Marshal.WriteInt32(self + 128, (int)param_6);
+                Marshal.WriteInt32(self + 132, (int)param_7);
+                Marshal.WriteByte(self + 104, 1);
+                Marshal.WriteInt32(self + 108, (int)param_2);
+                Marshal.WriteInt32(self + 112, (int)param_3);
+                Marshal.WriteInt64(self + 120, param_4);
+                Vector3 pos = pluginInterface.ClientState.LocalPlayer.Position;
+                pos = Marshal.PtrToStructure<Actor>(GetActorFromPlaceholder("<t>")).Position;
+                //I'm not sure if Dalamud has this straight wrong or if it's a quirk of this particular function
+                Vector3 adjusted = new Vector3(pos.X, pos.Z, pos.Y);
+                PluginLog.Log($"position is {pos}");
+                bool returnval = RALDelegate((IntPtr)param_1, param_2, (uint)param_3, (uint)param_4, ref adjusted, 0);
+                return returnval;
+            }
+            
             if (action != 0 && target != 0)
                 return this.requestActionHook.Original(param_1, param_2, action, target, param_5, param_6, param_7);
             return this.requestActionHook.Original(param_1, param_2, param_3, param_4, param_5, param_6, param_7);
