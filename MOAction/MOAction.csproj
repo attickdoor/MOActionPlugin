@@ -33,24 +33,37 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Dalamud">
-      <HintPath>$(appdata)\XIVLauncher\addon\Hooks\Dalamud.dll</HintPath>
+    <Reference Include="Dalamud, Version=5.2.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\Dalamud.dll</HintPath>
     </Reference>
-    <Reference Include="ImGui.NET">
-      <HintPath>$(appdata)\XIVLauncher\addon\Hooks\ImGui.NET.dll</HintPath>
+    <Reference Include="ImGui.NET, Version=1.72.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\ImGui.NET.dll</HintPath>
     </Reference>
-    <Reference Include="ImGuiScene">
-      <HintPath>$(appdata)\XIVLauncher\addon\Hooks\ImGuiScene.dll</HintPath>
+    <Reference Include="ImGuiScene, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\ImGuiScene.dll</HintPath>
+    </Reference>
+    <Reference Include="Lumina, Version=2.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\Lumina.dll</HintPath>
     </Reference>
     <Reference Include="Lumina.Excel, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\Lumina.Excel.dll</HintPath>
+      <HintPath>..\..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\Lumina.Excel.dll</HintPath>
     </Reference>
-    <Reference Include="SDL2-CS">
-      <HintPath>$(appdata)\XIVLauncher\addon\Hooks\SDL2-CS.dll</HintPath>
+    <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="SDL2-CS, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\SDL2-CS.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Numerics" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -70,14 +83,6 @@
     <Compile Include="Target\ActorTarget.cs" />
     <Compile Include="Target\EntityTarget.cs" />
     <Compile Include="Target\TargetType.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Lumina">
-      <Version>2.5.0</Version>
-    </PackageReference>
-    <PackageReference Include="Newtonsoft.Json">
-      <Version>12.0.3</Version>
-    </PackageReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

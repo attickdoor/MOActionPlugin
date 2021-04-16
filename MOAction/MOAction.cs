@@ -23,6 +23,9 @@ namespace MOAction
 
         public delegate void OnSetUiMouseoverEntityId(long param1, long param2);
 
+        private delegate IntPtr GetPronounResolver(IntPtr UiModuleSelf);
+        private GetPronounResolver getPronounResolver;
+
         private readonly MOActionAddressResolver Address;
         private readonly MOActionConfiguration Configuration;
 
@@ -37,8 +40,9 @@ namespace MOAction
         public IntPtr focusTargLocation;
         public IntPtr regularTargLocation;
         public IntPtr uiMoEntityId = IntPtr.Zero;
-        public IntPtr MagicStructInfo = IntPtr.Zero;
-        private IntPtr MagicUiObject;
+        public IntPtr PronounModuleVtbl = IntPtr.Zero;
+        private IntPtr PronounModule;
+        private IntPtr GameGuiObj;
         private HashSet<uint> UnorthodoxFriendly;
         private HashSet<uint> UnorthodoxHostile;
 
@@ -52,10 +56,12 @@ namespace MOAction
             fieldMOLocation = scanner.GetStaticAddressFromSig("E8 ?? ?? ?? ?? 83 BF ?? ?? ?? ?? ?? 0F 84 ?? ?? ?? ?? 48 8D 4C 24 ??", 0x283);
             focusTargLocation = scanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 48 89 5C 24 ?? BB ?? ?? ?? ?? 48 89 7C 24 ??", 0);
             regularTargLocation = scanner.GetStaticAddressFromSig("F3 0F 11 05 ?? ?? ?? ?? EB 27", 0) + 0x4;
-            MagicStructInfo = scanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 48 8D 05 ?? ?? ?? ?? 48 89 05 ?? ?? ?? ?? 48 85 C9 74 0C", 0);
+            PronounModuleVtbl = scanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 48 8D 05 ?? ?? ?? ?? 48 89 05 ?? ?? ?? ?? 48 85 C9 74 0C", 0);
             
 
             Configuration = configuration;
+
+            GameGuiObj = plugin.Framework.Gui.GetUIModule();
 
             Address = new MOActionAddressResolver();
             Address.Setup(scanner);
@@ -72,7 +78,7 @@ namespace MOAction
             requestActionHook = new Hook<OnRequestActionDetour>(Address.RequestAction, new OnRequestActionDetour(HandleRequestAction), this);
             uiMoEntityIdHook = new Hook<OnSetUiMouseoverEntityId>(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId), this);
             PlaceholderResolver = Marshal.GetDelegateForFunctionPointer<ResolvePlaceholderActor>(Address.ResolvePlaceholderText);
-            MagicUiObject = IntPtr.Zero;
+            PronounModule = IntPtr.Zero;
 
             enabledActions = new HashSet<ulong>();
             UnorthodoxFriendly = new HashSet<uint>();
@@ -183,16 +189,21 @@ namespace MOAction
         }
         public void SetupPlaceholderResolver()
         {
-            while (MagicUiObject == IntPtr.Zero)
+            
+            while (PronounModule == IntPtr.Zero)
             {
                 try
                 {
-                    IntPtr step2 = Marshal.ReadIntPtr(MagicStructInfo) + 8;
-                    MagicUiObject = Marshal.ReadIntPtr(step2) + 0xe780 + 0x50;
+                    getPronounResolver = Marshal.GetDelegateForFunctionPointer<GetPronounResolver>(Marshal.ReadIntPtr(Marshal.ReadIntPtr(GameGuiObj) + 0x50));
+                    /*
+                    IntPtr step2 = Marshal.ReadIntPtr(PronounModuleVtbl) + 8;
+                    PronounModule = Marshal.ReadIntPtr(step2) + 0xe780 + 0x50;
+                    */
+                    PronounModule = getPronounResolver(GameGuiObj);
                 }
                 catch(Exception e)
                 {
-                    MagicUiObject = IntPtr.Zero;
+                    PronounModule = IntPtr.Zero;
                     continue;
                 }
             }
@@ -200,7 +211,7 @@ namespace MOAction
 
         public IntPtr GetActorFromPlaceholder(string placeholder)
         {
-            return (IntPtr)PlaceholderResolver((long)MagicUiObject, placeholder, 1, 0);
+            return (IntPtr)PlaceholderResolver((long)PronounModule, placeholder, 1, 0);
         }
     }
 }

@@ -5,8 +5,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using ImGuiNET;
-using System.Threading.Tasks;
-using System.Threading;
 using MOAction.Target;
 using MOAction.Configuration;
 
