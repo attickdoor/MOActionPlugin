@@ -3,13 +3,24 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using Dalamud.Data;
 using Dalamud.Game;
 using Dalamud.Game.ClientState;
-using Dalamud.Game.ClientState.Actors.Types;
-using Dalamud.Game.ClientState.Actors.Types.NonPlayer;
+using Dalamud.Game.ClientState.Objects;
+using Dalamud.Game.ClientState.Objects.Enums;
+using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Hooking;
+using Dalamud.Logging;
 using Dalamud.Plugin;
+using FFXIVClientStructs.FFXIV.Client.Graphics;
+using Dalamud.Game.ClientState.Keys;
 using MOAction.Configuration;
+using Vector3 = System.Numerics.Vector3;
+using FFXIVClientStructs.FFXIV.Client.UI.Misc;
+using Dalamud.Game.Gui;
+using ImGuiNET;
+using Dalamud.Game.ClientState.Statuses;
+using FFXIVClientStructs.FFXIV.Client.Game;
 
 namespace MOAction
 {
@@ -33,12 +44,12 @@ namespace MOAction
         public delegate void OnSetUiMouseoverEntityId(long param1, long param2);
 
         private readonly MOActionAddressResolver Address;
-        private readonly MOActionConfiguration Configuration;
+        private MOActionConfiguration Configuration;
 
         private Hook<OnRequestActionDetour> requestActionHook;
         private Hook<OnSetUiMouseoverEntityId> uiMoEntityIdHook;
 
-        public Dictionary<uint, List<StackEntry>> Stacks { get; set; }
+        public List<MoActionStack> Stacks { get; set; }
         private DalamudPluginInterface pluginInterface;
         private IEnumerable<Lumina.Excel.GeneratedSheets.Action> RawActions;
 
@@ -46,8 +57,8 @@ namespace MOAction
         public IntPtr focusTargLocation;
         public IntPtr regularTargLocation;
         public IntPtr uiMoEntityId = IntPtr.Zero;
-        public IntPtr MagicStructInfo = IntPtr.Zero;
-        private IntPtr MagicUiObject;
+        //public IntPtr MagicStructInfo = IntPtr.Zero;
+        //private IntPtr MagicUiObject;
         private HashSet<uint> UnorthodoxFriendly;
         private HashSet<uint> UnorthodoxHostile;
 
@@ -58,44 +69,84 @@ namespace MOAction
 
         private IntPtr thing;
 
-        public MOAction(SigScanner scanner, ClientState clientState, MOActionConfiguration configuration, ref DalamudPluginInterface plugin, IEnumerable<Lumina.Excel.GeneratedSheets.Action> rawActions)
+        public DataManager dataManager;
+        public TargetManager targetManager;
+        public ClientState clientState;
+        public KeyState keyState;
+        public static ObjectTable objectTable;
+        private GameGui gameGui;
+
+        private unsafe PronounModule* PM;
+        private unsafe ActionManager* AM;
+        private readonly int IdOffset = (int)Marshal.OffsetOf<FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject>("ObjectID");
+
+        public MOAction(SigScanner scanner, ClientState clientstate,
+                        DataManager datamanager, TargetManager targetmanager, ObjectTable objects, KeyState keystate, GameGui gamegui
+                        )
         {
+            clientstate.Login += LoadClientModules;
+            clientstate.Logout += ClearClientModules;
+
             fieldMOLocation = scanner.GetStaticAddressFromSig("E8 ?? ?? ?? ?? 83 BF ?? ?? ?? ?? ?? 0F 84 ?? ?? ?? ?? 48 8D 4C 24 ??", 0x283);
             focusTargLocation = scanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 48 89 5C 24 ?? BB ?? ?? ?? ?? 48 89 7C 24 ??", 0);
             regularTargLocation = scanner.GetStaticAddressFromSig("F3 0F 11 05 ?? ?? ?? ?? EB 27", 0) + 0x4;
-            MagicStructInfo = scanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 48 8D 05 ?? ?? ?? ?? 48 89 05 ?? ?? ?? ?? 48 85 C9 74 0C", 0);
+            //MagicStructInfo = scanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 48 8D 05 ?? ?? ?? ?? 48 89 05 ?? ?? ?? ?? 48 85 C9 74 0C", 0);
             
-
-            Configuration = configuration;
-
-            Address = new MOActionAddressResolver();
+            Address = new();
             Address.Setup(scanner);
 
-            pluginInterface = plugin;
-            RawActions = rawActions;
+            dataManager = datamanager;
+
+            //pluginInterface = plugin;
+            RawActions = dataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>();
+
+            targetManager = targetmanager;
+            clientState = clientstate;
+            objectTable = objects;
+            keyState = keystate;
+            gameGui = gamegui;
 
             RALDelegate = Marshal.GetDelegateForFunctionPointer<RequestActionLocationDelegate>(Address.RequestActionLocation);
             PostRequestResolver = Marshal.GetDelegateForFunctionPointer<PostRequest>(Address.PostRequest);
             thing = scanner.Module.BaseAddress + 0x1d8e490;
 
-            Stacks = new Dictionary<uint, List<StackEntry>>();
+            Stacks = new();
 
             PluginLog.Log("===== M O A C T I O N =====");
             PluginLog.Log("RequestAction address {IsIconReplaceable}", Address.RequestAction);
             PluginLog.Log("SetUiMouseoverEntityId address {SetUiMouseoverEntityId}", Address.SetUiMouseoverEntityId);
 
-            reqlochook = new Hook<RequestActionLocationDelegate>(Address.RequestActionLocation, new RequestActionLocationDelegate(ReqLocDetour), this);
-            requestActionHook = new Hook<OnRequestActionDetour>(Address.RequestAction, new OnRequestActionDetour(HandleRequestAction), this);
-            uiMoEntityIdHook = new Hook<OnSetUiMouseoverEntityId>(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId), this);
+            reqlochook = new Hook<RequestActionLocationDelegate>(Address.RequestActionLocation, new RequestActionLocationDelegate(ReqLocDetour));
+            requestActionHook = new Hook<OnRequestActionDetour>(Address.RequestAction, new OnRequestActionDetour(HandleRequestAction));
+            uiMoEntityIdHook = new Hook<OnSetUiMouseoverEntityId>(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId));
             PlaceholderResolver = Marshal.GetDelegateForFunctionPointer<ResolvePlaceholderActor>(Address.ResolvePlaceholderText);
-            MagicUiObject = IntPtr.Zero;
+            //MagicUiObject = IntPtr.Zero;
 
-            enabledActions = new HashSet<ulong>();
-            UnorthodoxFriendly = new HashSet<uint>();
-            UnorthodoxHostile = new HashSet<uint>();
+            enabledActions = new();
+            UnorthodoxFriendly = new();
+            UnorthodoxHostile = new();
             UnorthodoxHostile.Add(3575);
             UnorthodoxFriendly.Add(17055);
             UnorthodoxFriendly.Add(7443);
+        }
+
+        public void SetConfig(MOActionConfiguration config)
+        {
+            Configuration = config;
+        }
+
+        private unsafe void LoadClientModules(object sender, EventArgs args)
+        {
+            var framework = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance();
+            var uiModule = framework->GetUiModule();
+            PM = uiModule->GetPronounModule();
+            AM = ActionManager.Instance();
+        }
+
+        private unsafe void ClearClientModules(object sender, EventArgs args)
+        {
+            PM = null;
+            AM = null;
         }
 
         public void Enable()
@@ -128,34 +179,108 @@ namespace MOAction
         private bool HandleRequestAction(long param_1, uint param_2, ulong param_3, long param_4,
                        uint param_5, uint param_6, int param_7)
         {
-            var (action, target) = GetActionTarget((uint)param_3);
-            
-            if (param_3 == 7419)
+            var (action, target) = GetActionTarget((uint)param_3, param_2);
+            void EnqueueGroundTarget()
             {
-                
                 IntPtr self = (IntPtr)param_1;
+
                 Marshal.WriteInt32(self + 128, (int)param_6);
                 Marshal.WriteInt32(self + 132, (int)param_7);
                 Marshal.WriteByte(self + 104, 1);
                 Marshal.WriteInt32(self + 108, (int)param_2);
-                Marshal.WriteInt32(self + 112, (int)param_3);
+                Marshal.WriteInt32(self + 112, (int)action.RowId);
                 Marshal.WriteInt64(self + 120, param_4);
-                Vector3 pos = pluginInterface.ClientState.LocalPlayer.Position;
-                pos = Marshal.PtrToStructure<Actor>(GetActorFromPlaceholder("<t>")).Position;
-                //I'm not sure if Dalamud has this straight wrong or if it's a quirk of this particular function
-                Vector3 adjusted = new Vector3(pos.X, pos.Z, pos.Y);
-                PluginLog.Log($"position is {pos}");
-                bool returnval = RALDelegate((IntPtr)param_1, param_2, (uint)param_3, (uint)param_4, ref adjusted, 0);
-                return returnval;
             }
             
-            if (action != 0 && target != 0)
-                return this.requestActionHook.Original(param_1, param_2, action, target, param_5, param_6, param_7);
-            return this.requestActionHook.Original(param_1, param_2, param_3, param_4, param_5, param_6, param_7);
+            if (action == null) return requestActionHook.Original(param_1, param_2, param_3, param_4, param_5, param_6, param_7);
+            if (action.Name == "Earthly Star" && clientState.LocalPlayer.StatusList.Any(x => x.StatusId == 1248 || x.StatusId == 1224))
+                return requestActionHook.Original(param_1, param_2, param_3, param_4, param_5, param_6, param_7);
+            // Ground target "at my cursor"
+            if (action != null && target == null)
+            {
+                Vector3 pos;
+                var mousePos = gameGui.ScreenToWorld(ImGui.GetMousePos(), out pos);
+                if (Configuration.MouseClamp)
+                {
+                    var playerpos = clientState.LocalPlayer.Position;
+                    var distance = Vector3.Distance(playerpos, pos);
+                    if (distance > action.Range + 1)
+                    {
+                        pos = GetClampedGroundCoords(playerpos, pos, action.Range+1);
+                    }
+                     
+                }
+                EnqueueGroundTarget();
+                bool returnval = RALDelegate((IntPtr)param_1, param_2, action.RowId, (uint)param_4, ref pos, 0);
+                return returnval;
+
+            }
+
+            if (action != null && target != null)
+            {
+                // ground target at non-mouse
+                if (action.CastType == 7) {
+
+                    var targpos = target.Position;
+                    if (Configuration.OtherGroundClamp)
+                    {
+                        var playerpos = clientState.LocalPlayer.Position;
+                        var distance = Vector3.Distance(playerpos, targpos);
+                        if (distance > action.Range + 1)
+                        {
+                            targpos = GetClampedGroundCoords(playerpos, targpos, action.Range + 1);
+                        }
+                    }
+                    EnqueueGroundTarget();
+                    bool returnval = RALDelegate((IntPtr)param_1, param_2, action.RowId, (uint)param_4, ref targpos, 0);
+                    return returnval;
+                }
+                return requestActionHook.Original(param_1, param_2, action.RowId, target.ObjectId, param_5, param_6, param_7);
+            }
+            return requestActionHook.Original(param_1, param_2, param_3, param_4, param_5, param_6, param_7);
         }
 
-        private (uint action, uint target) GetActionTarget(uint ActionID)
+        private Vector3 GetClampedGroundCoords(Vector3 self, Vector3 dest, int range)
         {
+            Vector2 selfv2 = new Vector2(self.X, self.Z);
+
+            Vector2 destv2 = new Vector2(dest.X, dest.Z);
+            Vector2 normal = Vector2.Normalize(destv2 - selfv2);
+            Vector2 finalPos = selfv2 + (normal * (range + 1));
+            return new Vector3(finalPos.X, dest.Y, finalPos.Y);
+        }
+
+        private (Lumina.Excel.GeneratedSheets.Action action, GameObject target) GetActionTarget(uint ActionID, uint ActionType)
+        {
+            var action = RawActions.FirstOrDefault(x => x.RowId == ActionID);
+            if (action == default) return (null, null);
+            //var action = RawActions.First(x => x.RowId == ActionID);
+            var applicableActions = Stacks.Where(entry => entry.BaseAction == action);
+            MoActionStack stackToUse = null;
+            foreach (var entry in applicableActions)
+            {
+                if (entry.Modifier == VirtualKey.NO_KEY)
+                {
+                    stackToUse = entry;
+                }
+                else if (keyState[entry.Modifier])
+                {
+                    stackToUse = entry;
+                }
+            }
+            if (stackToUse == null)
+            {
+                return (null, null);
+            }
+            foreach (StackEntry entry in stackToUse.Entries)
+            {
+                if (CanUseAction(entry, ActionType))
+                {
+                    if (!entry.Action.CanTargetFriendly && !entry.Action.CanTargetHostile) return (entry.Action, clientState.LocalPlayer);
+                    return (entry.Action, entry.Target.getPtr());
+                }
+            }
+            /*
             if (Stacks.ContainsKey(ActionID))
             {
                 List<StackEntry> stack = Stacks[ActionID];
@@ -163,21 +288,32 @@ namespace MOAction
                 {
                     if (CanUseAction(t)) return (t.actionID, t.target.GetTargetActorId());
                 }
-            }
-            return (0, 0);
+            }*/
+            return (null, null);
         }
 
-        private bool CanUseAction(StackEntry targ)
+        private bool CanUseAction(StackEntry targ, uint ActionType)
         {
-            if (targ.target == null || targ.actionID == 0) return false;
-            var action = RawActions.SingleOrDefault(row => (ulong)row.RowId == targ.actionID);
+            if (targ.Target == null || targ.Action == null) return false;
             
+            var action = targ.Action;
+            var target = targ.Target.GetTargetActorId();
 
-            for (var i = 0; i < this.pluginInterface.ClientState.Actors.Length; i++)
+            // ground target "at my mouse cursor"
+            if (!targ.Target.ObjectNeeded)
             {
-                var a = this.pluginInterface.ClientState.Actors[i];
-                if (a != null && a.ActorId == targ.target.GetTargetActorId())
+                return true;
+            }
+            
+            foreach (GameObject a in objectTable)            
+            {
+                //var a = clientState.Actors[i];
+                if (a != null && a.ObjectId == target)
                 {
+                    unsafe
+                    {
+                        if (AM->IsRecastTimerActive((ActionType)ActionType, action.RowId)) return false;
+                    }
                     if (Configuration.RangeCheck)
                     {
                         if (UnorthodoxFriendly.Contains((uint)action.RowId))
@@ -186,10 +322,10 @@ namespace MOAction
                         }
                         else if ((byte)action.Range < a.YalmDistanceX) return false;
                     }
-                    if (a is PlayerCharacter) return action.CanTargetFriendly || action.CanTargetParty 
+                    if (a.ObjectKind == ObjectKind.Player) return action.CanTargetFriendly || action.CanTargetParty 
                             || action.CanTargetSelf
                             || action.RowId == 17055 || action.RowId == 7443;
-                    if (a is BattleNpc)
+                    if (a.ObjectKind == ObjectKind.BattleNpc)
                     {
                         BattleNpc b = (BattleNpc)a;
                         if (b.BattleNpcKind != BattleNpcSubKind.Enemy) return action.CanTargetFriendly || action.CanTargetParty
@@ -202,49 +338,24 @@ namespace MOAction
             return false;
         }
 
-        public IntPtr GetGuiMoPtr()
+        public GameObject GetGuiMoPtr()
         {
-            return uiMoEntityId;
+            return objectTable.CreateObjectReference(uiMoEntityId);
         }
-        public IntPtr GetFieldMoPtr()
+        public uint GetFieldMoPtr() => (uint)Marshal.ReadInt32(fieldMOLocation);
+        public GameObject GetFocusPtr()
         {
-            return fieldMOLocation;
+            return objectTable.CreateObjectReference(Marshal.ReadIntPtr(focusTargLocation));
         }
-        public IntPtr GetFocusPtr()
+        public GameObject GetRegTargPtr()
         {
-            return Marshal.ReadIntPtr(focusTargLocation);
+            return objectTable.CreateObjectReference(regularTargLocation - IdOffset);
         }
-        public IntPtr GetRegTargPtr()
-        {
-            return regularTargLocation;
-        }
+        public GameObject NewFieldMo() => targetManager.MouseOverTarget;
 
-        public IntPtr GetPartyMember(int pos)
+        public unsafe GameObject GetActorFromPlaceholder(string placeholder)
         {
-            var member = pluginInterface.ClientState.PartyList[pos];
-            if (member == null || member.Actor == null) return IntPtr.Zero;
-            return member.Actor.Address;
-        }
-        public void SetupPlaceholderResolver()
-        {
-            while (MagicUiObject == IntPtr.Zero)
-            {
-                try
-                {
-                    IntPtr step2 = Marshal.ReadIntPtr(MagicStructInfo) + 8;
-                    MagicUiObject = Marshal.ReadIntPtr(step2) + 0xe780 + 0x50;
-                }
-                catch(Exception e)
-                {
-                    MagicUiObject = IntPtr.Zero;
-                    continue;
-                }
-            }
-        }
-
-        public IntPtr GetActorFromPlaceholder(string placeholder)
-        {
-            return (IntPtr)PlaceholderResolver((long)MagicUiObject, placeholder, 1, 0);
+            return objectTable.CreateObjectReference((IntPtr)PM->ResolvePlaceholder(placeholder, 1, 0));
         }
     }
 }

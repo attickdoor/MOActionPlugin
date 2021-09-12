@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Dalamud.Game.ClientState.Objects.Types;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -9,20 +10,26 @@ namespace MOAction.Target
 {
     public class ActorTarget : TargetType
     {
-        public ActorTarget(PtrFunc func) : base(func) { }
+        public ActorTarget(PtrFunc func, string name) : base(func, name) { }
+
+        public ActorTarget(PtrFunc func, string name, bool objneed) : base(func, name, objneed) {  }
+
         public override uint GetTargetActorId()
         {
-            IntPtr ptr = getPtr();
+            GameObject obj = getPtr();
             if (IsTargetValid())
-                return (uint)Marshal.ReadInt32(ptr);
+                return obj.ObjectId;
+                //return (uint)Marshal.ReadInt32(ptr);
             return 0;
         }
 
         public override bool IsTargetValid()
         {
-            IntPtr ptr = getPtr();
-            uint val = (uint)Marshal.ReadInt32(ptr);
-            return val != 0xe0000000 || val != 0;
+            GameObject obj = getPtr();
+            if (obj == null) return false;
+            return obj.ObjectId != 0xe0000000 || obj.ObjectId != 0;
+            //uint val = (uint)Marshal.ReadInt32(ptr);
+            //return val != 0xe0000000 || val != 0;
         }
     }
 }

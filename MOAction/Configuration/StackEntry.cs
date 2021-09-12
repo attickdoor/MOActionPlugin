@@ -9,13 +9,13 @@ namespace MOAction.Configuration
 {
     public class StackEntry
     {
-        public uint actionID;
-        public TargetType target { get; set; }
+        public Lumina.Excel.GeneratedSheets.Action Action;
+        public TargetType Target { get; set; }
 
-        public StackEntry(uint id, TargetType targ)
+        public StackEntry(Lumina.Excel.GeneratedSheets.Action action, TargetType targ)
         {
-            actionID = id;
-            target = targ;
+            Action = action;
+            Target = targ;
         }
     }
 }

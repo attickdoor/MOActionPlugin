@@ -5,13 +5,26 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using ImGuiNET;
-using System.Threading.Tasks;
-using System.Threading;
 using MOAction.Target;
 using MOAction.Configuration;
+using Dalamud.Data;
+using Dalamud.Game.ClientState;
+using Dalamud.Game;
+using Dalamud.Game.ClientState.Objects;
+using Dalamud.Game.ClientState.Keys;
+using System.Diagnostics;
+using FFXIVClientStructs;
+using Dalamud.Logging;
+using SigScanner = Dalamud.Game.SigScanner;
+using FFXIVClientStructs.FFXIV.Client.UI.Misc;
+using Dalamud.Game.Gui;
+using System.Text.Json;
+using System.Text;
+using Newtonsoft.Json;
 
 namespace MOAction
 {
+    // This class handles the visual GUI frontend and organizing of action stacks.
     internal class MOActionPlugin : IDalamudPlugin
     {
         public string Name => "Mouseover Action Plugin";
@@ -21,372 +34,491 @@ namespace MOAction
         private DalamudPluginInterface pluginInterface;
         private MOAction moAction;
 
-        private List<ApplicableAction> applicableActions;
-        private List<(uint key, List<StackEntry> value)> Stacks;
+        private List<Lumina.Excel.GeneratedSheets.Action> applicableActions;
         private List<TargetType> TargetTypes;
-        private readonly string[] tTypeNames = { "UI Mouseover", "Field Mouseover", "Regular Target", "Focus Target", "Target of Target", "Myself", "<2>", "<3>", "<4>", "<5>", "<6>", "<7>", "<8>" };
+        private List<TargetType> GroundTargetTypes;
+        private readonly string[] tTypeNames = { "UI Mouseover", "Field Mouseover", "Regular Target", "Focus Target", "Target of Target", "Myself", "<2>", "<3>", "<4>", "<5>", "<6>", "<7>", "<8>", "Mouse Cursor (Ground Target)" };
         private List<GuiSettings> SortedStackFlags;
         private List<GuiSettings> UnsortedStackFlags;
-        List<ApplicableAction> actions;
-        List<ApplicableAction> oldActions;
-        String[] actionNames;
-        private bool OldConfig;
-        private bool[] flagsSelected;
-        private bool UIMOEnabled;
-        private bool FieldMOEnabled;
+        private List<MoActionStack> NewStacks;
+        private Dictionary<string, HashSet<MoActionStack>> SavedStacks;
+        //List<Lumina.Excel.GeneratedSheets.Action> actions;
+    
+        private bool firstTimeUpgrade = false;
         private bool rangeCheck;
+        private bool mouseClamp;
+        private bool otherGroundClamp;
 
         private readonly string[] soloJobNames = { "AST", "WHM", "SCH", "SMN", "BLM", "RDM", "BLU", "BRD", "MCH", "DNC", "DRK", "GNB", "WAR", "PLD", "DRG", "MNK", "SAM", "NIN" };
         private readonly string[] roleActionNames = { "BLM SMN RDM BLU", "BRD MCH DNC",  "MNK DRG NIN SAM", "PLD WAR DRK GNB", "WHM SCH AST"};
+        private readonly uint[] GroundTargets = { 3569, 3639, 188, 7439, 2262 };
+
+        private Dictionary<string, List<Lumina.Excel.GeneratedSheets.Action>> JobActions;
 
         private bool isImguiMoSetupOpen = false;
 
-        private readonly int CURRENT_CONFIG_VERSION = 5;
+        private readonly int CURRENT_CONFIG_VERSION = 6;
 
-        public void Initialize(DalamudPluginInterface pluginInterface)
+        private ClientState clientState;
+        private TargetManager targetManager;
+        private DataManager dataManager;
+        private CommandManager commandManager;
+        private SigScanner SigScanner;
+        private KeyState KeyState;
+        //private FFXIVClientStructs.Attributes.Addon addon;
+
+        private bool testo; 
+
+        unsafe public MOActionPlugin(DalamudPluginInterface pluginInterface,  CommandManager commands,  DataManager datamanager, GameGui gamegui, KeyState keystate, ObjectTable objects, SigScanner scanner, ClientState clientstate, TargetManager targetmanager)
         {
-            Stacks = new List<(uint key, List<StackEntry> value)>();
-
-            SortedStackFlags = new List<GuiSettings>();
-            UnsortedStackFlags = new List<GuiSettings>();
-
             this.pluginInterface = pluginInterface;
-            actions = new List<ApplicableAction>();
-            actionNames = new string[0];
 
-            this.pluginInterface.CommandManager.AddHandler("/pmoaction", new CommandInfo(OnCommandDebugMouseover)
+            commands.AddHandler("/pmoaction", new CommandInfo(OnCommandDebugMouseover)
             {
                 HelpMessage = "Open a window to edit mouseover action settings.",
                 ShowInHelp = true
             });
 
-            this.applicableActions = new List<ApplicableAction>();
-            oldActions = new List<ApplicableAction>();
+            applicableActions = new List<Lumina.Excel.GeneratedSheets.Action>();
+            clientState = clientstate;
+            dataManager = datamanager;
+            targetManager = targetmanager;
+            commandManager = commands;
+            SigScanner = scanner;
+            KeyState = keystate;
 
-            InitializeData();
-
-            this.pluginInterface.UiBuilder.OnOpenConfigUi += (sender, args) => isImguiMoSetupOpen = true;
-            this.pluginInterface.UiBuilder.OnBuildUi += UiBuilder_OnBuildUi;
-        }
-
-        private void InitializeData()
-        {
-            var rawActions = pluginInterface.Data.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>().Where(row => row.IsPlayerAction);
-            foreach (Lumina.Excel.GeneratedSheets.Action a in rawActions)
+            NewStacks = new();
+            SavedStacks = new();
+            foreach (var a in dataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>().Where(row => row.IsPlayerAction && !row.IsPvP).ToList())
             {
+                // compatability with xivcombo, enochian turns into f/b4
+                if (a.RowId == 3575)
+                    a.CanTargetHostile = true;
+                // Ley Lines and Passage of Arms are not true ground target
+                else if (a.RowId == 3573 || a.RowId == 7385)
+                    a.CastType = 1;
+                // Other ground targets have to be able to target anything
+                else if (GroundTargets.Contains(a.RowId)) {
+                    a.CanTargetDead = true;
+                    a.CanTargetFriendly = true;
+                    a.CanTargetHostile = true;
+                    a.CanTargetParty = true;
+                    a.CanTargetSelf = true;
+                }
+                applicableActions.Add(a);
+                /*
                 if (a.RowId == 3575)
                     applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, true, (byte)a.ClassJobCategory.Row, a.IsPvP));
                 else if (a.RowId == 17055 || a.RowId == 7443)
                     applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, true, true, a.CanTargetFriendly, a.CanTargetHostile, (byte)a.ClassJobCategory.Row, a.IsPvP));
                 else
                     applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, a.CanTargetHostile, (byte)a.ClassJobCategory.Row, a.IsPvP));
+                */
             }
+            JobActions = new();
             SortActions();
-            oldActions.Remove(new ApplicableAction(173));
+            moAction = new MOAction(SigScanner, clientState, dataManager, targetManager, objects, keystate, gamegui);
+
+            foreach (string jobname in soloJobNames)
+            {
+                JobActions.Add(jobname, applicableActions.Where(action => action.ClassJobCategory.Value.Name.ToString().Contains(jobname)).ToList());
+            }
+
+            TargetTypes = new List<TargetType>
+            {
+                new EntityTarget(moAction.GetGuiMoPtr, "UI Mouseover"),
+                new EntityTarget(moAction.NewFieldMo, "Field Mouseover"),
+                //new ActorTarget(() => objects.First(a => a.ObjectId == moAction.GetFieldMoPtr()), "Field Mouseover"),
+                new EntityTarget(() => moAction.GetActorFromPlaceholder("<t>"), "Target"),
+                new EntityTarget(() => moAction.GetActorFromPlaceholder("<f>"), "Focus Target"),
+                new EntityTarget(() => moAction.GetActorFromPlaceholder("<tt>"), "Target of Target"),
+                new EntityTarget(() => moAction.GetActorFromPlaceholder("<me>"), "Self"),
+                new EntityTarget(() => moAction.GetActorFromPlaceholder("<2>"), "<2>"),
+                new EntityTarget(() => moAction.GetActorFromPlaceholder("<3>"), "<3>"),
+                new EntityTarget(() => moAction.GetActorFromPlaceholder("<4>"), "<4>"),
+                new EntityTarget(() => moAction.GetActorFromPlaceholder("<5>"), "<5>"),
+                new EntityTarget(() => moAction.GetActorFromPlaceholder("<6>"), "<6>"),
+                new EntityTarget(() => moAction.GetActorFromPlaceholder("<7>"), "<7>"),
+                new EntityTarget(() => moAction.GetActorFromPlaceholder("<8>"), "<8>")
+            };
+
+            GroundTargetTypes = new List<TargetType>
+            {
+                new EntityTarget(() => null, "Mouse Location", false),
+            };
+
             var config = pluginInterface.GetPluginConfig() as MOActionConfiguration ?? new MOActionConfiguration();
-            
+
             // big upgrade for old moaction config
-            if (config.Version < 3)
+            if (config.Version < 6)
             {
-                config.SetOldFlags(new bool[oldActions.Count]);
-
-                if (config.StackFlags == null)
-                    config.SetStackFlags(new List<GuiSettings>());
-
-                config.Version = 3;
-
-                for (int i = 0; i < config.StackFlags.Count; i++)
-                {
-                    config.StackFlags[i].refjob = config.StackFlags[i].jobs;
-                    if (config.StackFlags[i].jobs == 4)
-                    {
-                        if (config.StackFlags[i].baseAbility >= 11)
-                            config.StackFlags[i].baseAbility++;
-                        for (var j = 0; j < config.StackFlags[i].stackAbilities.Count; j++)
-                        {
-                            if (config.StackFlags[i].stackAbilities[j] >= 11)
-                                config.StackFlags[i].stackAbilities[j]++;
-                        }
-                    }
-                }
-                for (int i = 0; i < config.OldFlags.Length; i++)
-                    config.OldFlags[i] = false;
+                config = new MOActionConfiguration();
+                firstTimeUpgrade = true;
             }
-            // Upgrade blm stacks to contain enochian
-            if (config.Version < 4)
+            Configuration = config;
             {
-                config.Version = 4;
-                for (int i = 0; i < config.StackFlags.Count; i++)
-                {
-                    if (config.StackFlags[i].jobs == 4)
-                    {
-                        if (config.StackFlags[i].baseAbility >= 11)
-                            config.StackFlags[i].baseAbility++;
-                        for (var j = 0; j < config.StackFlags[i].stackAbilities.Count; j++)
-                        {
-                            if (config.StackFlags[i].stackAbilities[j] >= 11)
-                                config.StackFlags[i].stackAbilities[j]++;
-                        }
-                    }
-                }
+                var tmpstacks = RebuildStacks(Configuration.Stacks);
+                SavedStacks = SortStacks(tmpstacks);
             }
-
-            if (config.Version < 5)
-            {
-                config.Version = 5;
-                for (var i = 0; i < config.StackFlags.Count; i++)
-                {
-                    for (var j = 0; j < config.StackFlags[i].stackTargets.Count; j++)
-                    {
-                        if (config.StackFlags[i].stackTargets[j] > 3)
-                            config.StackFlags[i].stackTargets[j]++;
-                    }
-                }
-            }
-
-            Configuration = config as MOActionConfiguration;
-
-            OldConfig = Configuration.OldConfigActive;
-            UIMOEnabled = Configuration.oldMO;
-            FieldMOEnabled = Configuration.oldField;
-            SortedStackFlags = Configuration.StackFlags;
             rangeCheck = Configuration.RangeCheck;
-            moAction = new MOAction(pluginInterface.TargetModuleScanner, pluginInterface.ClientState, Configuration, ref pluginInterface, rawActions);
+            mouseClamp = Configuration.MouseClamp;
+            otherGroundClamp = Configuration.OtherGroundClamp;
 
-            moAction.SetupPlaceholderResolver();
-
-            TargetTypes = new List<TargetType>();
-            TargetTypes.Add(new EntityTarget(moAction.GetGuiMoPtr));
-            TargetTypes.Add(new ActorTarget(moAction.GetFieldMoPtr));
-            TargetTypes.Add(new ActorTarget(moAction.GetRegTargPtr));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<f>")));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<tt>")));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<me>")));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<2>")));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<3>")));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<4>")));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<5>")));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<6>")));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<7>")));
-            TargetTypes.Add(new EntityTarget(() => moAction.GetActorFromPlaceholder("<8>")));
-
-            flagsSelected = Configuration.OldFlags;
-            if (flagsSelected.Count() < oldActions.Count()) {
-                bool[] newFlags = new bool[oldActions.Count()];
-                flagsSelected.CopyTo(newFlags, 0);
-                flagsSelected = newFlags;
-            }
+            moAction.SetConfig(Configuration);
 
             moAction.Enable();
-            if (OldConfig) SetOldConfig();
-            else
+            foreach (var entry in SavedStacks)
             {
-                SetNewConfig();
-                MergeUnsorted();
+                moAction.Stacks.AddRange(entry.Value);
             }
+            pluginInterface.UiBuilder.OpenConfigUi += () => isImguiMoSetupOpen = true;
+            pluginInterface.UiBuilder.Draw += UiBuilder_OnBuildUi;
+
         }
+
 
         private void UiBuilder_OnBuildUi()
         {
-            if (!isImguiMoSetupOpen)
-            {
-                if (UnsortedStackFlags.Count != 0)
-                {
-                    StackUpdateAndSave();
-                }
-                return;
-            }
-            if (Configuration.OldConfigActive)
-                DrawOldConfig();
-            else
-                DrawNewConfig();           
+            if (firstTimeUpgrade)
+                DrawUpgradeNotice();
+            else if (isImguiMoSetupOpen)
+                DrawConfig();
+            else if (NewStacks.Count != 0)
+                SortStacks();
         }
 
-        #region OldGui
-        private void DrawOldConfig()
+        private void DrawUpgradeNotice()
         {
-            ImGui.SetNextWindowSize(new Vector2(740, 490), ImGuiCond.FirstUseEver);
+            ImGui.SetNextWindowSize(new Vector2(800, 400), ImGuiCond.Appearing);
+            ImGui.Begin("MOAction 4.0 update Information");
+            ImGui.Text("MOAction 4.0 is a BREAKING update. This means that the entirety of your config has been wiped.");
+            ImGui.Text("This is an unfortunate side effect of me being not the best developer. I apologize but it's the only sane way forward. Here are the patch notes:");
+            ImGui.Text("- Removed \"old config\". It's never coming back. You will set up your stacks and you will like it.");
+            ImGui.Text("- Added support for every PvE-usable action in the game.");
+            ImGui.Text("-- Ground targeted actions WILL queue properly, and DO work for all placeholders. There is a special mouse placement option as well for them.");
+            if (ImGui.Button("ok"))
+                firstTimeUpgrade = false;
+            ImGui.End();
+        }
 
-            ImGui.Begin("MouseOver action setup", ref isImguiMoSetupOpen,
-                ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoScrollbar);
-            ImGui.Text("This window allows you to enable and disable actions which will affect your mouse over targets.");
-            ImGui.Separator();
-
-            ImGui.BeginChild("scrolling", new Vector2(0, 400), true, ImGuiWindowFlags.HorizontalScrollbar);
-
-            ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0, 3));
-
-            ImGui.Checkbox("Enable mouseover on UI elements", ref UIMOEnabled);
-            ImGui.Checkbox("Enable mouseover on field entities", ref FieldMOEnabled);
-
-            string lastClassJob = "";
-
-            // Support actions first
-            if (ImGui.CollapsingHeader("Support Actions"))
+        private void DrawConfigForList(ICollection<MoActionStack> list)
+        {
+            for (int i = 0; i < list.Count; i++)
             {
-                ImGui.Indent();
-                for (var i = 0; i < oldActions.Count(); i++)
+                ImGui.PushID(i);
+                var entry = list.ElementAt(i);
+                //ImGui.PushID(entry.BaseAction.Name); //push base action
+                                                   // By default, no action is selected.
+                if (ImGui.CollapsingHeader(entry.BaseAction == null? "Unset Action###" : entry.BaseAction.Name + "###"))
                 {
-                    var action = oldActions[i];
-
-                    if (action.CanTargetParty && !action.IsPvP && !action.IsRoleAction)
+                    ImGui.SetNextItemWidth(100);
+                    // Require user to select a job, filtering actions down.
+                    if (ImGui.BeginCombo("Job", entry.Job))
                     {
-                        if (!lastClassJob.Equals(ClassJobCategoryToName_(action.ClassJobCategory)))
+                        foreach (string job in soloJobNames)
                         {
-                            lastClassJob = ClassJobCategoryToName_(action.ClassJobCategory);
-                            if (ImGui.CollapsingHeader(lastClassJob + "##Support"))
+                            if (ImGui.Selectable(job))
                             {
-                                for (int j = i; j < oldActions.Count(); j++)
+                                if (entry.Job != null && entry.Job != job)
                                 {
-                                    action = oldActions[j];
-                                    if (action.IsRoleAction || action.IsPvP) continue;
-                                    if (!ClassJobCategoryToName_(action.ClassJobCategory).Contains(lastClassJob))
-                                    {
-                                        break;
-                                    }
-                                    if (action.CanTargetParty && !action.IsPvP && !action.IsRoleAction)
-                                    {
-                                        ImGui.Indent();
-                                        ImGui.Checkbox(action.AbilityName, ref flagsSelected[j]);
-                                        ImGui.Unindent();
-                                    }
+                                    entry.BaseAction = null;
+                                    foreach (var stackentry in entry.Entries)
+                                        stackentry.Action = null;
                                 }
-
+                                entry.Job = job;
                             }
                         }
+                        ImGui.EndCombo();
                     }
-                }
-                ImGui.Unindent();
-            }
-            lastClassJob = "";
-            // Then combat actions
-            if (ImGui.CollapsingHeader("Damage Actions"))
-            {
-                ImGui.Indent();
-                for (var i = 0; i < oldActions.Count(); i++)
-                {
-                    var action = oldActions[i];
-
-                    if (action.CanTargetHostile && !action.IsPvP && !action.IsRoleAction)
+                    ImGui.SameLine();
+                    ImGui.SetNextItemWidth(100);
+                    if (ImGui.BeginCombo("Held Modifier Key", entry.Modifier.ToString()))
                     {
-                        if (!lastClassJob.Equals(ClassJobCategoryToName_(action.ClassJobCategory)))
+                        foreach (VirtualKey vk in MoActionStack.AllKeys)
                         {
-                            lastClassJob = ClassJobCategoryToName_(action.ClassJobCategory);
-                            if (ImGui.CollapsingHeader(lastClassJob + "##Damage"))
+                            if (ImGui.Selectable(vk.ToString()))
                             {
-                                for (int j = i; j < oldActions.Count(); j++)
-                                {
-                                    action = oldActions[j];
-                                    if (action.IsRoleAction || action.IsPvP) continue;
-                                    if (!ClassJobCategoryToName_(action.ClassJobCategory).Contains(lastClassJob))
-                                    {
-                                        break;
-                                    }
-                                    if (action.CanTargetHostile && !action.IsPvP && !action.IsRoleAction)
-                                    {
-                                        ImGui.Indent();
-                                        ImGui.Checkbox(action.AbilityName, ref flagsSelected[j]);
-                                        ImGui.Unindent();
-                                    }
-                                }
-
+                                entry.Modifier = vk;
                             }
                         }
+                        ImGui.EndCombo();
                     }
-                }
-                ImGui.Unindent();
-            }
-            lastClassJob = "";
-            // Role Actions
-            if (ImGui.CollapsingHeader("Role Actions"))
-            {
-                ImGui.Indent();
-                for (var i = 0; i < oldActions.Count(); i++)
-                {
-                    var action = oldActions[i];
-                    if (action.IsRoleAction)
+                    if (entry.Job != "Unset Job")
                     {
-                        if (!lastClassJob.Equals(ClassJobCategoryToName_(action.ClassJobCategory)))
+                        // ImGui.PushID(entry.Job);
+                        ImGui.Indent();
+                        // Select base action.
+                        ImGui.SetNextItemWidth(200);
+                        if (ImGui.BeginCombo("Base Action", entry.BaseAction == null ? "" : entry.BaseAction.Name))
                         {
-                            lastClassJob = ClassJobCategoryToName_(action.ClassJobCategory);
-                            if (ImGui.CollapsingHeader(lastClassJob))
+                            foreach (var actionEntry in JobActions[entry.Job])
                             {
-                                for (int j = i; j < oldActions.Count(); j++)
+                                if (ImGui.Selectable(actionEntry.Name))
                                 {
-                                    action = oldActions[j];
-                                    if (!lastClassJob.Equals(ClassJobCategoryToName_(action.ClassJobCategory)))
+                                    entry.BaseAction = actionEntry;
+                                    // By default, add UI mouseover as the first TargetType
+                                    if (entry.Entries.Count == 0)
                                     {
-                                        break;
+                                        entry.Entries.Add(new(actionEntry, TargetTypes[0]));
                                     }
-                                    if (!action.IsPvP && (action.CanTargetHostile || action.CanTargetParty)){
-                                        ImGui.Indent();
-                                        ImGui.Checkbox(action.AbilityName, ref flagsSelected[j]);
-                                        ImGui.Unindent();
+                                    else
+                                    {
+                                        entry.Entries[0].Action = actionEntry;
                                     }
                                 }
-
                             }
+                            ImGui.EndCombo();
                         }
+                        if (entry.BaseAction != null)
+                        {
+                            // ImGui.PushID(entry.BaseAction.Name); // push action name
+                            ImGui.Indent();
+                            for (int j = 0; j < entry.Entries.Count; j++)
+                            {
+                                var stackEntry = entry.Entries[j];
+
+                                ImGui.PushID(j); // push stack entry number
+                                                 //foreach (var stackEntry in entry.Entries)
+                                                 //{
+                                ImGui.Text($"Ability #{entry.Entries.IndexOf(stackEntry) + 1}");
+                                ImGui.SetNextItemWidth(200);
+                                if (ImGui.BeginCombo("Target", stackEntry.Target == null ? "" : stackEntry.Target.TargetName))
+                                {
+                                    foreach (var target in TargetTypes)
+                                    {
+                                        if (ImGui.Selectable(target.TargetName))
+                                        {
+                                            stackEntry.Target = target;
+                                        }
+                                    }
+                                    if (stackEntry.Action.CastType == 7)
+                                    {
+                                        foreach (var target in GroundTargetTypes)
+                                            if (ImGui.Selectable(target.TargetName))
+                                            {
+                                                stackEntry.Target = target;
+                                            }
+                                    }
+                                    
+                                    ImGui.EndCombo();
+                                }
+                                ImGui.SameLine();
+                                ImGui.SetNextItemWidth(200);
+                                if (ImGui.BeginCombo("Ability", stackEntry.Action == null ? "" : stackEntry.Action.Name))
+                                {
+                                    foreach (var ability in JobActions[entry.Job])
+                                    {
+                                        if (ImGui.Selectable(ability.Name))
+                                        {
+                                            stackEntry.Action = ability;
+                                            if (ability.CastType != 7 && GroundTargetTypes.Contains(stackEntry.Target))
+                                            {
+                                                stackEntry.Target = null;
+                                            }
+                                        }
+                                    }
+                                    ImGui.EndCombo();
+                                }
+
+                                // TODO: foreach makes lists immutable, use for-loop
+                                if (entry.Entries.Count() > 1)
+                                {
+                                    ImGui.SameLine();
+                                    if (ImGui.Button("Delete Entry"))
+                                    {
+                                        entry.Entries.Remove(stackEntry);
+                                        j--;
+                                    }
+                                }
+                                ImGui.PopID(); //pop stack entry number
+                            }
+
+                            ImGui.Unindent();
+                            // Add new entry to bottom of stack.
+                            if (ImGui.Button("Add new stack entry"))
+                            {
+                                entry.Entries.Add(new(entry.BaseAction, null));
+                            }
+                            ImGui.SameLine();
+                            if (ImGui.Button("Copy stack to clipboard"))
+                            {
+                                CopyToClipboard(new() { entry });
+                            }
+                            ImGui.SameLine();
+                            if (ImGui.Button ("Delete Stack"))
+                            {
+                                list.Remove(entry);
+                                //list.RemoveAt(i);
+                                i--;
+                            }
+
+                            // ImGui.PopID(); //pop action name
+                        }
+                        // ImGui.PopID(); // pop job name
+                        ImGui.Unindent();
                     }
+
+                    //foreach (string job in soloJobNames)
+                    //ImGui.Indent();
                 }
-                ImGui.Unindent();
+                //ImGui.PopID(); //pop base action
+                ImGui.PopID(); //pop i
             }
+            
+        }
 
-            ImGui.PopStyleVar();
+        private void CopyToClipboard(List<MoActionStack> list)
+        {
+            List<ConfigurationEntry> entries = new();
+            foreach (var elem in list)
+            {
+                var x = Configuration.Stacks.FirstOrDefault(e => elem.Equals(e));
+                if (x == default) continue;
+                entries.Add(x);
+            }
+            //var serializer = Newtonsoft.Json.JsonSerializer()
+            var json = JsonConvert.SerializeObject(entries);
+            ImGui.SetClipboardText(Convert.ToBase64String(Encoding.UTF8.GetBytes(json.ToString())));
+        }
 
+        private Dictionary<string, HashSet<MoActionStack>> SortStacks(List<MoActionStack> list)
+        {
+            Dictionary<string, HashSet<MoActionStack>> toReturn = new();
+            foreach (var name in soloJobNames)
+            {
+                var jobstack = list.Where(x => x.Job == name).ToList();
+                if (jobstack.Count > 0)
+                    toReturn[name] = new(jobstack);
+                else
+                    toReturn[name] = new();
+            }
+            return toReturn;
+        }
+
+        private void SaveStacks()
+        {
+            SortStacks();
+            moAction.Stacks.Clear();
+            foreach (var x in SavedStacks)
+            {
+                foreach (var entry in x.Value)
+                {
+                    moAction.Stacks.Add(entry);
+                }
+            }
+            Configuration.Stacks.Clear();
+            foreach (var x in moAction.Stacks)
+                Configuration.Stacks.Add(new ConfigurationEntry(x.BaseAction.RowId, x.Entries.Select(y => (y.Target.TargetName, y.Action.RowId)).ToList(), x.Modifier, x.Job));
+            UpdateConfig();
+        }
+        
+        private void DrawConfig()
+        {
+            ImGui.SetNextWindowSize(new Vector2(800, 800), ImGuiCond.Once);
+            ImGui.Begin("Action stack setup", ref isImguiMoSetupOpen,
+                ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar);
+            ImGui.Text("This window allows you to set up your action stacks.");
+            ImGui.Text("What is an action stack? ");
+            ImGui.SameLine();
+            if (ImGui.Button("Click me to learn!"))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://youtu.be/pm4eCxD90gs",
+                    UseShellExecute = true
+                });
+            }
+            
+            ImGui.Checkbox("Stack entry fails if target is out of range.", ref rangeCheck);
+            ImGui.Checkbox("Clamp Ground Target at mouse to max ability range.", ref mouseClamp);
+            ImGui.Checkbox("Clamp other Ground Target to max ability range.", ref otherGroundClamp);
+            if (ImGui.Button("Copy all stacks to clipboard"))
+            {
+                CopyToClipboard(moAction.Stacks);
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Import stacks from clipboard"))
+            {
+                try
+                {
+                    SavedStacks = SortStacks(
+                        RebuildStacks(
+                            JsonConvert.DeserializeObject<List<ConfigurationEntry>>(
+                                 Encoding.UTF8.GetString(
+                                    Convert.FromBase64String(
+                                        ImGui.GetClipboardText())))));
+                }
+                catch (Exception)
+                {
+                    ImGui.BeginPopup("oh no, cringe!");
+                    ImGui.EndPopup();
+                }
+            }
+            ImGui.BeginChild("scrolling", new Vector2(0, ImGui.GetWindowSize().Y - 250), true, ImGuiWindowFlags.NoScrollbar);
+            ImGui.PushID("Sorted Stacks");
+
+            // sorted stacks are grouped by job.
+            ImGui.PushID("Sorted Stacks");
+            foreach (var jobName in soloJobNames)
+            {
+                var entries = SavedStacks[jobName];
+                if (entries.Count == 0) continue;
+                var key = jobName;
+                
+                ImGui.PushID(key); //push job
+                
+                ImGui.SetNextItemWidth(300);
+                if (ImGui.CollapsingHeader(key))
+                {
+                    if (ImGui.Button("Copy All to Clipboard"))
+                    {
+                        CopyToClipboard(entries.ToList());
+                    }
+                    ImGui.Indent();
+                    DrawConfigForList(SavedStacks[jobName]);
+                    
+                    ImGui.Unindent();
+                }
+                ImGui.PopID(); //pop job
+            }
+            ImGui.PopID();
+            ImGui.PushID("Unsorted Stacks");
+            // Unsorted stacks are created when "Add stack" is clicked.
+            DrawConfigForList(NewStacks);
+            ImGui.PopID();
             ImGui.EndChild();
-
-            ImGui.Separator();
-
-            if (ImGui.Button("Enable All"))
-            {
-                for (var i = 0; i < flagsSelected.Length; i++)
-                {
-                    flagsSelected[i] = true;
-                }
-            }
-
-            ImGui.SameLine();
-
-            if (ImGui.Button("Disable All"))
-            {
-                for (var i = 0; i < flagsSelected.Length; i++)
-                {
-                    flagsSelected[i] = false;
-                }
-            }
-
-            ImGui.SameLine();
-
             if (ImGui.Button("Save"))
             {
-                SaveOld();
+                SaveStacks();
             }
             ImGui.SameLine();
-
             if (ImGui.Button("Save and Close"))
             {
                 isImguiMoSetupOpen = false;
-                SaveOld();
+                SaveStacks();
             }
-
             ImGui.SameLine();
-            if (ImGui.Button("Use action stacks"))
+            if (ImGui.Button("New Stack"))
             {
-                OldConfig = false;
-                SaveOld();
-                SetNewConfig();
-                return;
+                NewStacks.Add(new(null, new()));
             }
-
-            ImGui.Spacing();
             ImGui.End();
         }
-        #endregion OldGui
 
-        #region NewGui
-        private void DrawNewConfig()
+        private void SortStacks()
         {
+            foreach (var x in NewStacks)
+            {
+                if (x.Job != "Unset Job" && x.Entries.Count > 0)
+                    SavedStacks[x.Job].Add(x);
+            }
+            NewStacks.Clear();
+        }
+        #region TheOnlyGui
+        /*
+        private void DrawConfig()
+        {
+            ImGui.SetNextWindowSize(new Vector2(800, 800), ImGuiCond.FirstUseEver);
             ImGui.Begin("Action stack setup", ref isImguiMoSetupOpen,
                 ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar);
             ImGui.Text("This window allows you to set up your action stacks.");
@@ -395,6 +527,7 @@ namespace MOAction
             ImGui.BeginChild("scrolling", new Vector2(0, ImGui.GetWindowSize().Y - 125), true, ImGuiWindowFlags.NoScrollbar);
             string jobname = "";
             ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0, 3));
+            // listing of stacks that have not been newly created
             for (var i = 0; i < SortedStackFlags.Count; i++)
             {
                 var currentStack = SortedStackFlags[i];
@@ -424,6 +557,17 @@ namespace MOAction
 
                             actions = GetJobActions(currentStack.jobs);
                             actionNames = actions.Select(s => s.AbilityName).ToArray();
+
+                            if (ImGui.BeginCombo("test", "helo"))
+                            {
+                                foreach (Lumina.Excel.GeneratedSheets.Action a in applicableActions)
+                                {
+                                    if (ImGui.Selectable(a.Name))
+                                    {
+
+                                    }
+                                }
+                            }
 
                             ImGui.SetNextItemOpen(SortedStackFlags[j].isOpen);
                             try
@@ -464,6 +608,7 @@ namespace MOAction
                                         if (SortedStackFlags[j].baseAbility != -1 && tmpabilities[k] == -1)
                                             tmpabilities[k] = SortedStackFlags[j].baseAbility;
                                     }*/
+                                    /*
                                     ImGui.Indent();
 
                                     for (int k = 0; k < SortedStackFlags[j].stackAbilities.Count; k++)
@@ -513,6 +658,7 @@ namespace MOAction
                     }
                 }
             }
+            // listing of stacks that have been newly created
             for (int i = 0; i < UnsortedStackFlags.Count; i++)
             {
                 var currentSettings = UnsortedStackFlags[i];
@@ -576,7 +722,8 @@ namespace MOAction
                     {
                         if (UnsortedStackFlags[i].baseAbility != -1 && tmpabilities[j] == -1)
                             tmpabilities[j] = UnsortedStackFlags[i].baseAbility;
-                    }*/
+                    }*/ 
+                    /*
                     ImGui.Indent();
                     for (int j = 0; j < UnsortedStackFlags[i].stackAbilities.Count; j++)
                     {
@@ -649,18 +796,13 @@ namespace MOAction
                 isImguiMoSetupOpen = false;
                 StackUpdateAndSave();
             }
-            ImGui.SameLine();
-            if (ImGui.Button("Use Old Configuration"))
-            {
-                OldConfig = true;
-                StackUpdateAndSave();
-                SetOldConfig();
-                return;
-            }
+
             ImGui.Spacing();
             ImGui.End();
         }
-        #endregion NewGui
+        */
+        #endregion TheOnlyGui
+        /*
         private void StackUpdateAndSave()
         {
             SaveNew();
@@ -668,139 +810,48 @@ namespace MOAction
             UpdateConfig();
             SetNewConfig();
         }
-
-        private void MergeUnsorted()
-        {
-            SortedStackFlags.AddRange(UnsortedStackFlags);
-            SortedStackFlags.Sort();
-            UnsortedStackFlags.Clear();
-            for (var i = 0; i < SortedStackFlags.Count; i++)
-                SortedStackFlags[i].refjob = SortedStackFlags[i].jobs;
-            SaveNew();
-        }
-
-        private void SaveOld()
-        {
-            UpdateConfig();
-            pluginInterface.SavePluginConfig(Configuration);
-            SetOldConfig();
-        }
-
-        private void SaveNew()
-        {
-            for (var i = 0; i < SortedStackFlags.Count; i++)
-            {
-                //if (SortedStackFlags[i].refjob != SortedStackFlags[i].jobs) SortedStackFlags[i].refjob = SortedStackFlags[i].jobs;
-                for (var j = 0; j < SortedStackFlags[i].stackAbilities.Count; j++)
-                {
-                    if (SortedStackFlags[i].stackAbilities[j] == -1 || SortedStackFlags[i].stackTargets[j] == -1)
-                    {
-                        SortedStackFlags[i].stackAbilities.RemoveAt(j);
-                        SortedStackFlags[i].stackTargets.RemoveAt(j);
-                        j--;
-                    }
-                }
-                if (SortedStackFlags[i].stackAbilities.Count == 0)
-                {
-                    SortedStackFlags.RemoveAt(i);
-                    i--;
-                }
-            }
-            for (var i = 0; i < UnsortedStackFlags.Count; i++)
-            {
-                for (var j = 0; j < UnsortedStackFlags[i].stackAbilities.Count; j++)
-                {
-                    if (UnsortedStackFlags[i].stackAbilities[j] == -1 || UnsortedStackFlags[i].stackTargets[j] == -1)
-                    {
-                        UnsortedStackFlags[i].stackAbilities.RemoveAt(j);
-                        UnsortedStackFlags[i].stackTargets.RemoveAt(j);
-                        j--;
-                    }
-                }
-                if (UnsortedStackFlags[i].stackAbilities.Count == 0)
-                {
-                    UnsortedStackFlags.RemoveAt(i);
-                    i--;
-                }
-            }
-            
-        }
-
+        */
+        
+        
         private void UpdateConfig()
         {
             Configuration.Version = CURRENT_CONFIG_VERSION;
-            Configuration.SetStackFlags(SortedStackFlags);
-            Configuration.SetStacks(Stacks);
-            Configuration.SetOldFlags(flagsSelected);
-            Configuration.SetWindowVersion(OldConfig);
-            Configuration.SetOldField(FieldMOEnabled);
-            Configuration.SetOldMO(UIMOEnabled);
-            Configuration.SetRangeCheck(rangeCheck);
+            Configuration.RangeCheck = rangeCheck;
+            Configuration.MouseClamp = mouseClamp;
+            Configuration.OtherGroundClamp = otherGroundClamp;
+
             pluginInterface.SavePluginConfig(Configuration);
         }
+        
 
-        private void SetOldConfig()
+        public List<MoActionStack> RebuildStacks(List<ConfigurationEntry> configurationEntries)
         {
-            moAction.Stacks.Clear();
-            for (int i = 0; i < flagsSelected.Count(); i++)
+            if (configurationEntries == null) return new();
+            var toReturn = new List<MoActionStack>();
+            foreach (var entry in configurationEntries)
             {
-                if (flagsSelected[i] == true)
+                var action = applicableActions.First(x => x.RowId == entry.BaseId);
+                string job = entry.Job;
+                List<StackEntry> entries = new();
+                foreach (var stackEntry in entry.Stack)
                 {
-                    var tmp = new List<StackEntry>();
-                    if (UIMOEnabled) tmp.Add(new StackEntry(oldActions[i].ID, TargetTypes[0]));
-                    if (FieldMOEnabled) tmp.Add(new StackEntry(oldActions[i].ID, TargetTypes[1]));
-                    moAction.Stacks[oldActions[i].ID] = tmp;
+                    TargetType targ = TargetTypes.FirstOrDefault(x => x.TargetName == stackEntry.Item1);
+                    if (targ == default) targ = GroundTargetTypes[0];
+                    entries.Add(new(applicableActions.First(x => x.RowId == stackEntry.Item2), targ));
                 }
-                else
-                {
-                    moAction.Stacks.Remove(oldActions[i].ID);
-                }
+                MoActionStack tmp = new(action, entries);
+                tmp.Job = job;
+                tmp.Modifier = entry.Modifier;
+                toReturn.Add(tmp);
             }
-        }
 
-        private void SetNewConfig()
-        {
-            moAction.Stacks.Clear();
-            Stacks.Clear();
-            //Stacks = Configuration.Stacks;
-            SortedStackFlags = Configuration.StackFlags;
-            for (var i = 0; i < SortedStackFlags.Count; i++)
-            {
-                var actions = GetJobActions(SortedStackFlags[i].jobs);
-                var hasActions = actions.Count > 0;
-                if (!hasActions) Stacks.Add((0, new List<StackEntry>()));
-                else Stacks.Add((actions[SortedStackFlags[i].baseAbility].ID, new List<StackEntry>()));
-                for (var j = 0; j < SortedStackFlags[i].stackAbilities.Count; j++) {
-                    if (!hasActions) Stacks[i].value.Add(new StackEntry(0, null));
-                    else Stacks[i].value.Add(new StackEntry(actions[SortedStackFlags[i].stackAbilities[j]].ID, TargetTypes[SortedStackFlags[i].stackTargets[j]]));
-                    //Stacks[i].value[j].target = TargetTypes[StackFlags[i].stackTargets[j]];
-                }
-                if (Stacks[i].key > 0)
-                    moAction.Stacks[Stacks[i].key] = Stacks[i].value;
-            }
-            var currsize = Stacks.Count;
-            for (var i = 0; i < UnsortedStackFlags.Count; i++)
-            {
-                var actions = GetJobActions(UnsortedStackFlags[i].jobs);
-                var hasActions = actions.Count > 0;
-                if (!hasActions) Stacks.Add((0, new List<StackEntry>()));
-                else Stacks.Add((actions[UnsortedStackFlags[i].baseAbility].ID, new List<StackEntry>()));
-                for (var j = 0; j < UnsortedStackFlags[i].stackAbilities.Count; j++)
-                {
-                    if (!hasActions) Stacks[i + currsize].value.Add(new StackEntry(0, null));
-                    else Stacks[i + currsize].value.Add(new StackEntry(actions[UnsortedStackFlags[i].stackAbilities[j]].ID, TargetTypes[UnsortedStackFlags[i].stackTargets[j]]));
-                    //Stacks[i].value[j].target = TargetTypes[StackFlags[i].stackTargets[j]];
-                }
-                if (Stacks[i + currsize].key > 0)
-                    moAction.Stacks[Stacks[i + currsize].key] = Stacks[i + currsize].value;
-            }
+            return toReturn;
         }
-
         public void Dispose()
         {
             moAction.Dispose();
 
-            pluginInterface.CommandManager.RemoveHandler("/pmoaction");
+            commandManager.RemoveHandler("/pmoaction");
 
             pluginInterface.Dispose();
         }
@@ -810,157 +861,34 @@ namespace MOAction
             isImguiMoSetupOpen = true;
         }
 
-        private String GetName(uint actionID)
-        {
-            if (actionID == 0) return "Unset Action";
-            return applicableActions.First(elem => elem.ID == actionID).AbilityName;
-        }
-
-        private String ClassJobCategoryToName_(byte key)
-        {
-            if (key == 68) return "ACN SCH SMN";
-            var tmp = ClassJobCategoryToName(key);
-            switch (tmp)
-            {
-                case "SMN SCH":
-                    return "ACN SCH SMN";
-                case "WHM SCH AST":
-                    return "Healers";
-                case "BLM SMN RDM BLU":
-                    return "Casters";
-                case "BRD MCH DNC":
-                    return "Ranged";
-                case "PLD WAR DRK GNB":
-                    return "Tanks";
-                case "MNK DRG NIN SAM":
-                    return "Melee";
-            }
-            return tmp;
-        }
-        private string ClassJobCategoryToName(byte key)
-        {
-            switch (key)
-            {
-                case 1: return "All Classes";
-                case 2: return "GLA";
-                case 3: return "PGL";
-                case 4: return "MRD";
-                case 5: return "LNC";
-                case 6: return "ARC";
-                case 7: return "CNJ";
-                case 8: return "THM";
-                case 9: return "CRP";
-                case 10: return "BSM";
-                case 11: return "ARM";
-                case 12: return "GSM";
-                case 13: return "LTW";
-                case 14: return "WVR";
-                case 15: return "ALC";
-                case 16: return "CUL";
-                case 17: return "MIN";
-                case 18: return "BTN";
-                case 19: return "FSH";
-                case 20: return "PLD";
-                case 21: return "MNK";
-                case 22: return "WAR";
-                case 23: return "DRG";
-                case 24: return "BRD";
-                case 25: return "WHM";
-                case 26: return "BLM";
-                case 27: return "ACN";
-                case 28: return "SMN";
-                case 29: return "SCH";
-                case 38: return "PLD";
-                case 41: return "MNK";
-                case 44: return "WAR";
-                case 47: return "DRG";
-                case 50: return "BRD";
-                case 53: return "WHM";
-                case 55: return "BLM";
-                case 59: return "PLD WAR DRK GNB";
-                case 61: return "WHM SCH AST";
-                case 63: return "BLM SMN RDM BLU";
-                case 64: return "WHM SCH AST";
-                case 66: return "BRD MCH DNC";
-                case 68: return "SCH SMN";
-                case 69: return "SMN";
-                case 73: return "WHM SCH AST";
-                case 89: return "BLM SMN RDM BLU";
-                case 91: return "ROG";
-                case 92: return "NIN";
-                case 93: return "NIN";
-                case 94: return "NIN";
-                case 95: return "NIN";
-                case 96: return "MCH";
-                case 98: return "DRK";
-                case 99: return "AST";
-                case 103: return "NIN";
-                case 106: return "BRD";
-                case 111: return "SAM";
-                case 112: return "RDM";
-                case 113: return "PLD WAR DRK GNB";
-                case 114: return "MNK DRG NIN SAM";
-                case 115: return "BRD MCH DNC";
-                case 116: return "BLM SMN RDM BLU";
-                case 117: return "WHM SCH AST";
-                case 118: return "MNK DRG NIN SAM";
-                case 121: return "PLD WAR DRK GNB";
-                case 122: return "MNK DRG NIN SAM";
-                case 123: return "BRD MCH DNC";
-                case 125: return "WHM SCH AST";
-                case 129: return "BLU";
-                case 133: return "WHM SCH AST";
-                case 134: return "PLD WAR DRK GNB";
-                case 139: return "BRD MCH DNC";
-                case 147: return "BLM SMN RDM BLU";
-                case 148: return "MNK DRG NIN SAM";
-                case 149: return "GNB";
-                case 150: return "DNC";
-                case 160: return "SCH";
-                default: return "Unknown";
-
-            }
-        }
-
-        private List<ApplicableAction> GetJobActions(int index)
-        {
-            if (index >= 0)
-            {
-                return applicableActions.
-                        Where(item => ClassJobCategoryToName(item.ClassJobCategory).
-                                        Contains(soloJobNames[index]) &&
-                                        !item.IsPvP &&
-                                        (item.CanTargetParty || item.CanTargetHostile)).
-                        ToList();
-            }
-            return new List<ApplicableAction>();
-        }
-
         private void SortActions()
         {
-            List<ApplicableAction> tmp = new List<ApplicableAction>();
+            List<Lumina.Excel.GeneratedSheets.Action> tmp = new();
+            
             foreach (string elem in soloJobNames)
             {
-                foreach (ApplicableAction action in applicableActions)
+                foreach (var action in applicableActions)
                 {
-                    if (ClassJobCategoryToName(action.ClassJobCategory).Contains(elem) && !action.IsRoleAction)
+                    var nameStr = action.ClassJobCategory.Value.Name.ToString();
+                    if (nameStr.Contains(elem) && !action.IsRoleAction)
                         tmp.Add(action);
                 }
             }
 
-            foreach (string elem in roleActionNames)
+            foreach (string elem in soloJobNames)
             {
-                foreach (ApplicableAction action in applicableActions)
+                foreach (var action in applicableActions)
                 {
-                    if (ClassJobCategoryToName(action.ClassJobCategory).Contains(elem) && action.IsRoleAction)
+                    var nameStr = action.ClassJobCategory.Value.Name.ToString();                  
+                    if (nameStr.Contains(elem) && action.IsRoleAction && !tmp.Contains(action))
                         tmp.Add(action);
                 }
             }
             applicableActions.Clear();
-            oldActions.Clear();
-            foreach (ApplicableAction elem in tmp)
+            //oldActions.Clear();
+            foreach (var elem in tmp)
             {
-                oldActions.Add(elem);
+                //oldActions.Add(elem);
                 applicableActions.Add(elem);
             }
         }
