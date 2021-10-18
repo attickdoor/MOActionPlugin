@@ -1,10 +1,11 @@
 ﻿using Dalamud.Game;
 using Dalamud.Game.Internal;
 using System;
+using System.Runtime.InteropServices;
 
 namespace MOAction
 {
-    class MOActionAddressResolver : BaseAddressResolver
+    public class MOActionAddressResolver : BaseAddressResolver
     {
 
         public IntPtr RequestAction { get; private set; }
@@ -20,6 +21,9 @@ namespace MOAction
         public IntPtr FocusTarg;
         public IntPtr RegularTarg;
         public IntPtr PronounModule;
+        public IntPtr GetGroupTimer;
+
+        public IntPtr AnimLock;
         // This is so hacky. One day I'm going to figure out how to get proper sigs.
         protected override void Setup64Bit(SigScanner sig)
         {
@@ -36,6 +40,18 @@ namespace MOAction
             FocusTarg = sig.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 48 89 5C 24 ?? BB ?? ?? ?? ?? 48 89 7C 24 ??", 0);
             RegularTarg = sig.GetStaticAddressFromSig("F3 0F 11 05 ?? ?? ?? ?? EB 27", 0) + 0x4;
             PronounModule = sig.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 48 8D 05 ?? ?? ?? ?? 48 89 05 ?? ?? ?? ?? 48 85 C9 74 0C", 0);
+            AnimLock = sig.GetStaticAddressFromSig("E8 ?? ?? ?? ?? 84 DB 75 37", 0x1D);
+            GetGroupTimer = sig.ScanText("E8 ?? ?? ?? ?? 0F 57 FF 48 85 C0");
         }
+
+        [StructLayout(LayoutKind.Explicit, Size = 0x14)]
+        public unsafe struct RecastTimer
+        {
+            [FieldOffset(0x0)] public byte IsActive;
+            [FieldOffset(0x4)] public uint ActionID;
+            [FieldOffset(0x8)] public float Elapsed;
+            [FieldOffset(0xC)] public float Total;
+        }
+    
     }
 }

@@ -1,4 +1,5 @@
-﻿using Dalamud.Game.ClientState.Keys;
+﻿using Dalamud.Data;
+using Dalamud.Game.ClientState.Keys;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -28,6 +29,7 @@ namespace MOAction.Configuration
 
         public bool Equals(ConfigurationEntry c)
         {
+            if (c.Stack.Count != Entries.Count) return false;
             for (int i = 0; i < Entries.Count; i++)
             {
                 var myEntry = Entries[i];
@@ -49,6 +51,12 @@ namespace MOAction.Configuration
                 return false;
             var x = (MoActionStack)obj;
             return BaseAction.RowId == x.BaseAction.RowId && Job == x.Job;
+        }
+
+        public string GetJob(DataManager dm)
+        {
+            if (Job == "Unset Job") return Job;
+            return dm.GetExcelSheet<Lumina.Excel.GeneratedSheets.ClassJob>().First(x => x.RowId.ToString() == Job).Abbreviation;
         }
     }
 }

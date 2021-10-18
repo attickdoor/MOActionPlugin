@@ -21,6 +21,8 @@ using Dalamud.Game.Gui;
 using ImGuiNET;
 using Dalamud.Game.ClientState.Statuses;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using Lumina.Excel.GeneratedSheets;
+using static MOAction.MOActionAddressResolver;
 
 namespace MOAction
 {
@@ -49,6 +51,9 @@ namespace MOAction
         private Hook<OnRequestActionDetour> requestActionHook;
         private Hook<OnSetUiMouseoverEntityId> uiMoEntityIdHook;
 
+        public unsafe delegate RecastTimer* GetGroupTimerDelegate(void* @this, int cooldownGroup);
+        private readonly GetGroupTimerDelegate getGroupTimer;
+
         public List<MoActionStack> Stacks { get; set; }
         private DalamudPluginInterface pluginInterface;
         private IEnumerable<Lumina.Excel.GeneratedSheets.Action> RawActions;
@@ -67,7 +72,9 @@ namespace MOAction
         public bool IsGuiMOEnabled = false;
         public bool IsFieldMOEnabled = false;
 
-        private IntPtr thing;
+        private IntPtr AnimLock;
+
+        private bool IsLocked => Marshal.ReadInt32(AnimLock) != 0;
 
         public DataManager dataManager;
         public TargetManager targetManager;
@@ -86,6 +93,8 @@ namespace MOAction
         {
             clientstate.Login += LoadClientModules;
             clientstate.Logout += ClearClientModules;
+            if (clientstate.IsLoggedIn)
+                LoadClientModules(null, null);
 
             fieldMOLocation = scanner.GetStaticAddressFromSig("E8 ?? ?? ?? ?? 83 BF ?? ?? ?? ?? ?? 0F 84 ?? ?? ?? ?? 48 8D 4C 24 ??", 0x283);
             focusTargLocation = scanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 48 89 5C 24 ?? BB ?? ?? ?? ?? 48 89 7C 24 ??", 0);
@@ -108,7 +117,8 @@ namespace MOAction
 
             RALDelegate = Marshal.GetDelegateForFunctionPointer<RequestActionLocationDelegate>(Address.RequestActionLocation);
             PostRequestResolver = Marshal.GetDelegateForFunctionPointer<PostRequest>(Address.PostRequest);
-            thing = scanner.Module.BaseAddress + 0x1d8e490;
+            getGroupTimer = Marshal.GetDelegateForFunctionPointer<GetGroupTimerDelegate>(Address.GetGroupTimer);
+            //thing = scanner.Module.BaseAddress + 0x1d8e490;
 
             Stacks = new();
 
@@ -120,6 +130,7 @@ namespace MOAction
             requestActionHook = new Hook<OnRequestActionDetour>(Address.RequestAction, new OnRequestActionDetour(HandleRequestAction));
             uiMoEntityIdHook = new Hook<OnSetUiMouseoverEntityId>(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId));
             PlaceholderResolver = Marshal.GetDelegateForFunctionPointer<ResolvePlaceholderActor>(Address.ResolvePlaceholderText);
+            AnimLock = Address.AnimLock;
             //MagicUiObject = IntPtr.Zero;
 
             enabledActions = new();
@@ -163,6 +174,11 @@ namespace MOAction
             //reqlochook.Dispose();
         }
 
+        public unsafe RecastTimer* GetGroupRecastTimer(int group)
+        {
+            return group < 1 ? null : getGroupTimer(AM, group - 1);
+        }
+
         private void HandleUiMoEntityId(long param1, long param2)
         {
             //Log.Information("UI MO: {0}", param2);
@@ -176,25 +192,36 @@ namespace MOAction
             return reqlochook.Original(actionMgr, type, id, targetId, ref location, zero);
         }
 
-        private bool HandleRequestAction(long param_1, uint param_2, ulong param_3, long param_4,
+        private unsafe bool HandleRequestAction(long param_1, uint actionType, ulong actionID, long param_4,
                        uint param_5, uint param_6, int param_7)
         {
-            var (action, target) = GetActionTarget((uint)param_3, param_2);
+            if (actionType != 1) return requestActionHook.Original(param_1, actionType, actionID, param_4, param_5, param_6, param_7);
+            var (action, target) = GetActionTarget((uint)actionID, actionType);
             void EnqueueGroundTarget()
             {
                 IntPtr self = (IntPtr)param_1;
-
                 Marshal.WriteInt32(self + 128, (int)param_6);
                 Marshal.WriteInt32(self + 132, (int)param_7);
                 Marshal.WriteByte(self + 104, 1);
-                Marshal.WriteInt32(self + 108, (int)param_2);
+                Marshal.WriteInt32(self + 108, (int)actionType);
                 Marshal.WriteInt32(self + 112, (int)action.RowId);
                 Marshal.WriteInt64(self + 120, param_4);
             }
+            void DequeueGroundTarget()
+            {
+                IntPtr self = (IntPtr)param_1;
+
+                Marshal.WriteInt32(self + 128, 0);
+                Marshal.WriteInt32(self + 132, 0);
+                Marshal.WriteByte(self + 104, 0);
+                Marshal.WriteInt32(self + 108, 0);
+                Marshal.WriteInt32(self + 112, 0);
+                Marshal.WriteInt64(self + 120, 0);
+            }
             
-            if (action == null) return requestActionHook.Original(param_1, param_2, param_3, param_4, param_5, param_6, param_7);
+            if (action == null) return requestActionHook.Original(param_1, actionType, actionID, param_4, param_5, param_6, param_7);
             if (action.Name == "Earthly Star" && clientState.LocalPlayer.StatusList.Any(x => x.StatusId == 1248 || x.StatusId == 1224))
-                return requestActionHook.Original(param_1, param_2, param_3, param_4, param_5, param_6, param_7);
+                return requestActionHook.Original(param_1, actionType, actionID, param_4, param_5, param_6, param_7);
             // Ground target "at my cursor"
             if (action != null && target == null)
             {
@@ -204,40 +231,43 @@ namespace MOAction
                 {
                     var playerpos = clientState.LocalPlayer.Position;
                     var distance = Vector3.Distance(playerpos, pos);
-                    if (distance > action.Range + 1)
+                    if (distance > action.Range)
                     {
-                        pos = GetClampedGroundCoords(playerpos, pos, action.Range+1);
+                        pos = GetClampedGroundCoords(playerpos, pos, action.Range);
                     }
                      
                 }
-                EnqueueGroundTarget();
-                bool returnval = RALDelegate((IntPtr)param_1, param_2, action.RowId, (uint)param_4, ref pos, 0);
-                return returnval;
+                if (IsLocked) EnqueueGroundTarget();
+                //if (!AM->IsRecastTimerActive((ActionType)param_2, action.RowId)) return RALDelegate((IntPtr)param_1, param_2, action.RowId, (uint)param_4, ref pos, 0);
+                return RALDelegate((IntPtr)param_1, actionType, action.RowId, (uint)param_4, ref pos, 0);
+                //DequeueGroundTarget();
+                //return false;
 
             }
 
             if (action != null && target != null)
             {
                 // ground target at non-mouse
-                if (action.CastType == 7) {
+                if (action.TargetArea) {
 
                     var targpos = target.Position;
                     if (Configuration.OtherGroundClamp)
                     {
                         var playerpos = clientState.LocalPlayer.Position;
                         var distance = Vector3.Distance(playerpos, targpos);
-                        if (distance > action.Range + 1)
+                        if (distance > action.Range)
                         {
-                            targpos = GetClampedGroundCoords(playerpos, targpos, action.Range + 1);
+                            targpos = GetClampedGroundCoords(playerpos, targpos, action.Range);
                         }
                     }
-                    EnqueueGroundTarget();
-                    bool returnval = RALDelegate((IntPtr)param_1, param_2, action.RowId, (uint)param_4, ref targpos, 0);
+                    if (IsLocked)
+                        EnqueueGroundTarget();
+                    bool returnval = RALDelegate((IntPtr)param_1, actionType, action.RowId, (uint)param_4, ref targpos, 0);
                     return returnval;
                 }
-                return requestActionHook.Original(param_1, param_2, action.RowId, target.ObjectId, param_5, param_6, param_7);
+                return requestActionHook.Original(param_1, actionType, action.RowId, target.ObjectId, param_5, param_6, param_7);
             }
-            return requestActionHook.Original(param_1, param_2, param_3, param_4, param_5, param_6, param_7);
+            return requestActionHook.Original(param_1, actionType, actionID, param_4, param_5, param_6, param_7);
         }
 
         private Vector3 GetClampedGroundCoords(Vector3 self, Vector3 dest, int range)
@@ -276,7 +306,7 @@ namespace MOAction
             {
                 if (CanUseAction(entry, ActionType))
                 {
-                    if (!entry.Action.CanTargetFriendly && !entry.Action.CanTargetHostile) return (entry.Action, clientState.LocalPlayer);
+                    if (!entry.Action.CanTargetFriendly && !entry.Action.CanTargetHostile && !entry.Action.CanTargetParty && !entry.Action.CanTargetDead) return (entry.Action, clientState.LocalPlayer);
                     return (entry.Action, entry.Target.getPtr());
                 }
             }
@@ -292,11 +322,26 @@ namespace MOAction
             return (null, null);
         }
 
-        private bool CanUseAction(StackEntry targ, uint ActionType)
+        private unsafe int AvailableCharges(Lumina.Excel.GeneratedSheets.Action action)
+        {
+            RecastTimer* timer;
+            if (action.CooldownGroup == 58)
+                timer = GetGroupRecastTimer(action.AdditionalCooldownGroup);
+            else
+                timer = GetGroupRecastTimer(action.CooldownGroup);
+            if (action.MaxCharges == 0) return timer->IsActive ^ 1;
+            return (int)((action.MaxCharges+1) * (timer->Elapsed / timer->Total));
+        }
+
+        private unsafe bool CanUseAction(StackEntry targ, uint actionType)
         {
             if (targ.Target == null || targ.Action == null) return false;
-            
+            var y = AM->GetActionStatus((ActionType)actionType, targ.Action.RowId, targ.Target.GetTargetActorId());
+            if (AM->GetActionStatus((ActionType)actionType, AM->GetAdjustedActionId(targ.Action.RowId), targ.Target.GetTargetActorId()) != 0)
+                return false;
             var action = targ.Action;
+            var action2 = AM->GetAdjustedActionId(action.RowId);
+            action = RawActions.First(x => x.RowId == action2);
             var target = targ.Target.GetTargetActorId();
 
             // ground target "at my mouse cursor"
@@ -310,9 +355,21 @@ namespace MOAction
                 //var a = clientState.Actors[i];
                 if (a != null && a.ObjectId == target)
                 {
+                    
                     unsafe
                     {
-                        if (AM->IsRecastTimerActive((ActionType)ActionType, action.RowId)) return false;
+                        if (action.ActionCategory.Value.RowId == (uint)ActionType.Ability && action.MaxCharges == 0)
+                        {
+                            if (AM->IsRecastTimerActive((ActionType)actionType, action.RowId))
+                            {
+                                return false;
+                            }
+                        }
+                        else if (action.MaxCharges > 0 || (action.CooldownGroup != 0 && action.AdditionalCooldownGroup != 0))
+                        {
+                            if (AvailableCharges(action) == 0) return false;
+                            
+                        }
                     }
                     if (Configuration.RangeCheck)
                     {
