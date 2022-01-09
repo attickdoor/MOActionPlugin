@@ -5,8 +5,8 @@
     <Product>MOActionPlugin</Product>
     <Description>This plugin allows for actions to be used on mouseover targets without a macro.</Description>
     <Copyright>Copyleft attick 2021 baybeeee</Copyright>
-    <AssemblyVersion>4.0.9</AssemblyVersion>
-    <FileVersion>4.0.9</FileVersion>
+    <AssemblyVersion>4.2.4</AssemblyVersion>
+    <FileVersion>4.2.4</FileVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OutputPath>bin\$(Configuration)\</OutputPath>
     <AppDesignerFolder>Properties.bak</AppDesignerFolder>
@@ -26,22 +26,22 @@
       <HintPath>..\..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\Dalamud.dll</HintPath>
     </Reference>
     <Reference Include="FFXIVClientStructs">
-      <HintPath>..\..\dalamud-goatcorp\bin\Release\FFXIVClientStructs.dll</HintPath>
+      <HintPath>..\..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\FFXIVClientStructs.dll</HintPath>
     </Reference>
     <Reference Include="ImGui.NET">
-      <HintPath>..\..\dalamud-goatcorp\bin\Release\ImGui.NET.dll</HintPath>
+      <HintPath>..\..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\ImGui.NET.dll</HintPath>
     </Reference>
     <Reference Include="ImGuiScene">
-      <HintPath>..\..\dalamud-goatcorp\bin\Release\ImGuiScene.dll</HintPath>
+      <HintPath>..\..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\ImGuiScene.dll</HintPath>
     </Reference>
     <Reference Include="Lumina">
-      <HintPath>..\..\dalamud-goatcorp\bin\Release\Lumina.dll</HintPath>
+      <HintPath>..\..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\Lumina.dll</HintPath>
     </Reference>
     <Reference Include="Lumina.Excel">
-      <HintPath>..\..\dalamud-goatcorp\bin\Release\Lumina.Excel.dll</HintPath>
+      <HintPath>..\..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\Lumina.Excel.dll</HintPath>
     </Reference>
     <Reference Include="SDL2-CS">
-      <HintPath>..\..\dalamud-goatcorp\bin\Release\SDL2-CS.dll</HintPath>
+      <HintPath>..\..\..\..\AppData\Roaming\XIVLauncher\addon\Hooks\dev\SDL2-CS.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

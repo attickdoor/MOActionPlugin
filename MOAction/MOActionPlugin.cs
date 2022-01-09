@@ -9,22 +9,24 @@ using MOAction.Target;
 using MOAction.Configuration;
 using Dalamud.Data;
 using Dalamud.Game.ClientState;
-using Dalamud.Game;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Keys;
 using System.Diagnostics;
-using FFXIVClientStructs;
-using Dalamud.Logging;
 using SigScanner = Dalamud.Game.SigScanner;
-using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 using Dalamud.Game.Gui;
-using System.Text.Json;
 using System.Text;
 using Newtonsoft.Json;
+using Dalamud.Interface;
 
 namespace MOAction
 {
     // This class handles the visual GUI frontend and organizing of action stacks.
+    // Listen.
+    // I appreciate you wanting to read my code.
+    // This class is nothing but ugly GUI code.
+    // It works, and that's what I care about.
+    // ImGui is a pain to work with, but I managed to write something that gets the job done. That's all I care about.
+    // Proceed with this warning in mind.
     internal class MOActionPlugin : IDalamudPlugin
     {
         public string Name => "Mouseover Action Plugin";
@@ -37,22 +39,16 @@ namespace MOAction
         private List<Lumina.Excel.GeneratedSheets.Action> applicableActions;
         private List<TargetType> TargetTypes;
         private List<TargetType> GroundTargetTypes;
-        private readonly string[] tTypeNames = { "UI Mouseover", "Field Mouseover", "Regular Target", "Focus Target", "Target of Target", "Myself", "<2>", "<3>", "<4>", "<5>", "<6>", "<7>", "<8>", "Mouse Cursor (Ground Target)" };
-        private List<GuiSettings> SortedStackFlags;
-        private List<GuiSettings> UnsortedStackFlags;
         private List<MoActionStack> NewStacks;
         private Dictionary<string, HashSet<MoActionStack>> SavedStacks;
-        //List<Lumina.Excel.GeneratedSheets.Action> actions;
     
         private bool firstTimeUpgrade = false;
         private bool rangeCheck;
         private bool mouseClamp;
         private bool otherGroundClamp;
 
-       // private readonly string[] soloJobNames = { "AST", "WHM", "SCH", "SMN", "BLM", "RDM", "BLU", "BRD", "MCH", "DNC", "DRK", "GNB", "WAR", "PLD", "DRG", "MNK", "SAM", "NIN" };
         private readonly Lumina.Excel.GeneratedSheets.ClassJob[] Jobs;
-        private readonly List<Lumina.Excel.GeneratedSheets.ClassJob> JobAbbreviations; 
-        private readonly string[] roleActionNames = { "BLM SMN RDM BLU", "BRD MCH DNC",  "MNK DRG NIN SAM", "PLD WAR DRK GNB", "WHM SCH AST"};
+        private readonly List<Lumina.Excel.GeneratedSheets.ClassJob> JobAbbreviations;
         private readonly uint[] GroundTargets = { 3569, 3639, 188, 7439, 2262 };
 
         private Dictionary<string, List<Lumina.Excel.GeneratedSheets.Action>> JobActions;
@@ -66,10 +62,6 @@ namespace MOAction
         private DataManager dataManager;
         private CommandManager commandManager;
         private SigScanner SigScanner;
-        private KeyState KeyState;
-        //private FFXIVClientStructs.Attributes.Addon addon;
-
-        private bool testo; 
 
         unsafe public MOActionPlugin(DalamudPluginInterface pluginInterface,  CommandManager commands,  DataManager datamanager, GameGui gamegui, KeyState keystate, ObjectTable objects, SigScanner scanner, ClientState clientstate, TargetManager targetmanager)
         {
@@ -87,9 +79,8 @@ namespace MOAction
             targetManager = targetmanager;
             commandManager = commands;
             SigScanner = scanner;
-            KeyState = keystate;
 
-            Jobs = dataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.ClassJob>().Where(x => x.JobIndex > 0).ToArray();//.Select(y=> y.Abbreviation.ToString()).ToArray();
+            Jobs = dataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.ClassJob>().Where(x => x.JobIndex > 0).ToArray();
             JobAbbreviations = Jobs.ToList();
             JobAbbreviations.Sort((x, y) => x.Abbreviation.ToString().CompareTo(y.Abbreviation.ToString()));
             NewStacks = new();
@@ -115,14 +106,7 @@ namespace MOAction
                     a.CanTargetSelf = true;
                 }
                 applicableActions.Add(a);
-                /*
-                if (a.RowId == 3575)
-                    applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, true, (byte)a.ClassJobCategory.Row, a.IsPvP));
-                else if (a.RowId == 17055 || a.RowId == 7443)
-                    applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, true, true, a.CanTargetFriendly, a.CanTargetHostile, (byte)a.ClassJobCategory.Row, a.IsPvP));
-                else
-                    applicableActions.Add(new ApplicableAction((uint)a.RowId, a.Name, a.IsRoleAction, a.CanTargetSelf, a.CanTargetParty, a.CanTargetFriendly, a.CanTargetHostile, (byte)a.ClassJobCategory.Row, a.IsPvP));
-                */
+
             }
             JobActions = new();
             SortActions();
@@ -138,7 +122,6 @@ namespace MOAction
             {
                 new EntityTarget(moAction.GetGuiMoPtr, "UI Mouseover"),
                 new EntityTarget(moAction.NewFieldMo, "Field Mouseover"),
-                //new ActorTarget(() => objects.First(a => a.ObjectId == moAction.GetFieldMoPtr()), "Field Mouseover"),
                 new EntityTarget(() => moAction.GetActorFromPlaceholder("<t>"), "Target"),
                 new EntityTarget(() => moAction.GetActorFromPlaceholder("<f>"), "Focus Target"),
                 new EntityTarget(() => moAction.GetActorFromPlaceholder("<tt>"), "Target of Target"),
@@ -236,8 +219,6 @@ namespace MOAction
             {
                 ImGui.PushID(i);
                 var entry = list.ElementAt(i);
-                //ImGui.PushID(entry.BaseAction.Name); //push base action
-                                                   // By default, no action is selected.
                 if (ImGui.CollapsingHeader(entry.BaseAction == null? "Unset Action###" : entry.BaseAction.Name + "###"))
                 {
                     ImGui.SetNextItemWidth(100);
@@ -275,7 +256,6 @@ namespace MOAction
                     }
                     if (entry.GetJob(dataManager) != "Unset Job")
                     {
-                        // ImGui.PushID(entry.Job);
                         ImGui.Indent();
                         // Select base action.
                         ImGui.SetNextItemWidth(200);
@@ -301,15 +281,13 @@ namespace MOAction
                         }
                         if (entry.BaseAction != null)
                         {
-                            // ImGui.PushID(entry.BaseAction.Name); // push action name
                             ImGui.Indent();
                             for (int j = 0; j < entry.Entries.Count; j++)
                             {
                                 var stackEntry = entry.Entries[j];
 
                                 ImGui.PushID(j); // push stack entry number
-                                                 //foreach (var stackEntry in entry.Entries)
-                                                 //{
+
                                 ImGui.Text($"Ability #{entry.Entries.IndexOf(stackEntry) + 1}");
                                 ImGui.SetNextItemWidth(200);
                                 if (ImGui.BeginCombo("Target", stackEntry.Target == null ? "" : stackEntry.Target.TargetName))
@@ -378,20 +356,12 @@ namespace MOAction
                             if (ImGui.Button ("Delete Stack"))
                             {
                                 list.Remove(entry);
-                                //list.RemoveAt(i);
                                 i--;
                             }
-
-                            // ImGui.PopID(); //pop action name
                         }
-                        // ImGui.PopID(); // pop job name
                         ImGui.Unindent();
                     }
-
-                    //foreach (string job in soloJobNames)
-                    //ImGui.Indent();
                 }
-                //ImGui.PopID(); //pop base action
                 ImGui.PopID(); //pop i
             }
             
@@ -406,7 +376,6 @@ namespace MOAction
                 if (x == default) continue;
                 entries.Add(x);
             }
-            //var serializer = Newtonsoft.Json.JsonSerializer()
             var json = JsonConvert.SerializeObject(entries);
             ImGui.SetClipboardText(Convert.ToBase64String(Encoding.UTF8.GetBytes(json.ToString())));
         }
@@ -445,7 +414,7 @@ namespace MOAction
         
         private void DrawConfig()
         {
-            ImGui.SetNextWindowSize(new Vector2(800, 800), ImGuiCond.Once);
+            ImGui.SetNextWindowSize(new Vector2(800, 800) * ImGuiHelpers.GlobalScale, ImGuiCond.Once);
             ImGui.Begin("Action stack setup", ref isImguiMoSetupOpen,
                 ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar);
             ImGui.Text("This window allows you to set up your action stacks.");
@@ -461,8 +430,6 @@ namespace MOAction
             }
             
             ImGui.Checkbox("Stack entry fails if target is out of range.", ref rangeCheck);
-            ImGui.Checkbox("Clamp Ground Target at mouse to max ability range.", ref mouseClamp);
-            ImGui.Checkbox("Clamp other Ground Target to max ability range.", ref otherGroundClamp);
             if (ImGui.Button("Copy all stacks to clipboard"))
             {
                 CopyToClipboard(moAction.Stacks);
@@ -493,7 +460,7 @@ namespace MOAction
                     ImGui.EndPopup();
                 }
             }
-            ImGui.BeginChild("scrolling", new Vector2(0, ImGui.GetWindowSize().Y - 250), true, ImGuiWindowFlags.NoScrollbar);
+            ImGui.BeginChild("scrolling", new Vector2(0, (ImGui.GetWindowSize().Y - 200) * ImGuiHelpers.GlobalScale), true, ImGuiWindowFlags.NoScrollbar);
             ImGui.PushID("Sorted Stacks");
 
             // sorted stacks are grouped by job.
@@ -572,7 +539,8 @@ namespace MOAction
             var toReturn = new List<MoActionStack>();
             foreach (var entry in configurationEntries)
             {
-                var action = applicableActions.First(x => x.RowId == entry.BaseId);
+                var action = applicableActions.FirstOrDefault(x => x.RowId == entry.BaseId);
+                if (action == default) continue;
                 string job = entry.Job;
                 List<StackEntry> entries = new();
                 foreach (var stackEntry in entry.Stack)
@@ -629,10 +597,8 @@ namespace MOAction
                 }
             }
             applicableActions.Clear();
-            //oldActions.Clear();
             foreach (var elem in tmp)
             {
-                //oldActions.Add(elem);
                 applicableActions.Add(elem);
             }
             applicableActions.Sort((x, y) => x.Name.ToString().CompareTo(y.Name.ToString()));
