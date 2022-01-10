@@ -36,6 +36,9 @@ namespace MOAction
 
         public delegate void OnSetUiMouseoverEntityId(long param1, long param2);
 
+        private delegate IntPtr GetPronounResolver(IntPtr UiModuleSelf);
+        private GetPronounResolver getPronounResolver;
+
         private readonly MOActionAddressResolver Address;
         private MOActionConfiguration Configuration;
 
