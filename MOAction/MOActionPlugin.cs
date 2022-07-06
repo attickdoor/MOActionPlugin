@@ -557,13 +557,12 @@ namespace MOAction
 
             return toReturn;
         }
+
         public void Dispose()
         {
             moAction.Dispose();
 
             commandManager.RemoveHandler("/pmoaction");
-
-            pluginInterface.Dispose();
         }
 
         private void OnCommandDebugMouseover(string command, string arguments)
