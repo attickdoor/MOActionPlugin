@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using System.Runtime.InteropServices;
 using Dalamud.Data;
 using Dalamud.Game;
@@ -14,7 +13,6 @@ using Dalamud.Logging;
 using Dalamud.Plugin;
 using Dalamud.Game.ClientState.Keys;
 using MOAction.Configuration;
-using Vector3 = System.Numerics.Vector3;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 using Dalamud.Game.Gui;
 using FFXIVClientStructs.FFXIV.Client.Game;
@@ -31,13 +29,7 @@ namespace MOAction
         [UnmanagedFunctionPointer(CallingConvention.ThisCall, CharSet = CharSet.Ansi)]
         private delegate ulong ResolvePlaceholderActor(long param1, string param2, byte param3, byte param4);
 
-        private delegate void PostRequest(IntPtr param1, long param2);
-        private PostRequest PostRequestResolver;
-
         public delegate void OnSetUiMouseoverEntityId(long param1, long param2);
-
-        private delegate IntPtr GetPronounResolver(IntPtr UiModuleSelf);
-        private GetPronounResolver getPronounResolver;
 
         private readonly MOActionAddressResolver Address;
         private MOActionConfiguration Configuration;
@@ -46,10 +38,9 @@ namespace MOAction
         private Hook<OnSetUiMouseoverEntityId> uiMoEntityIdHook;
 
         public unsafe delegate RecastTimer* GetGroupTimerDelegate(void* @this, int cooldownGroup);
-        private readonly GetGroupTimerDelegate getGroupTimer;
+        private GetGroupTimerDelegate getGroupTimer;
 
         public List<MoActionStack> Stacks { get; set; }
-        private DalamudPluginInterface pluginInterface;
         private IEnumerable<Lumina.Excel.GeneratedSheets.Action> RawActions;
 
         public IntPtr fieldMOLocation;
@@ -101,15 +92,12 @@ namespace MOAction
             keyState = keystate;
             gameGui = gamegui;
 
-            getGroupTimer = Marshal.GetDelegateForFunctionPointer<GetGroupTimerDelegate>(Address.GetGroupTimer);
-
             Stacks = new();
 
             PluginLog.Log("===== M O A C T I O N =====");
-            PluginLog.Log("RequestAction address {IsIconReplaceable}", Address.RequestAction);
             PluginLog.Log("SetUiMouseoverEntityId address {SetUiMouseoverEntityId}", Address.SetUiMouseoverEntityId);
             
-            uiMoEntityIdHook = new Hook<OnSetUiMouseoverEntityId>(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId));
+            uiMoEntityIdHook = Hook<OnSetUiMouseoverEntityId>.FromAddress(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId));
 
             enabledActions = new();
             UnorthodoxFriendly = new();
@@ -132,6 +120,7 @@ namespace MOAction
                 var uiModule = framework->GetUiModule();
                 PM = uiModule->GetPronounModule();
                 AM = ActionManager.Instance();
+                getGroupTimer = Marshal.GetDelegateForFunctionPointer<GetGroupTimerDelegate>((IntPtr)ActionManager.fpGetRecastGroupDetail);
             }
             catch (Exception e) {
                 PluginLog.Log(e.Message);
@@ -149,7 +138,7 @@ namespace MOAction
         private unsafe void HookUseAction()
         {
             SafeMemory.WriteBytes(Address.GtQueuePatch, new byte[] { 0xEB });
-            requestActionHook = new Hook<OnRequestActionDetour>((IntPtr)ActionManager.fpUseAction, new OnRequestActionDetour(HandleRequestAction));
+            requestActionHook = Hook<OnRequestActionDetour>.FromAddress((IntPtr)ActionManager.fpUseAction, new OnRequestActionDetour(HandleRequestAction));
             requestActionHook.Enable();
         }
 
@@ -195,7 +184,7 @@ namespace MOAction
             if (action == null) return requestActionHook.Original(param_1, actionType, actionID, param_4, param_5, param_6, param_7, param_8);
 
             // Earthly Star is the only GT that changes to a different action.
-            if (action.Name == "Earthly Star" && clientState.LocalPlayer.StatusList.Any(x => x.StatusId == 1248 || x.StatusId == 1224))
+            if (action.RowId == 7439 && clientState.LocalPlayer.StatusList.Any(x => x.StatusId == 1248 || x.StatusId == 1224))
                 return requestActionHook.Original(param_1, actionType, actionID, param_4, param_5, param_6, param_7, param_8);
             
 
@@ -206,18 +195,23 @@ namespace MOAction
             // Enqueue GT action
             if (action.TargetArea)
             {
-
                 *(long*)((IntPtr)AM + 0x98) = objectId;
                 *(byte*)((IntPtr)AM + 0xB8) = 1;
             }
             return ret;
         }
 
-        private (Lumina.Excel.GeneratedSheets.Action action, GameObject target) GetActionTarget(uint ActionID, uint ActionType)
+        private unsafe (Lumina.Excel.GeneratedSheets.Action action, GameObject target) GetActionTarget(uint ActionID, uint ActionType)
         {
             var action = RawActions.FirstOrDefault(x => x.RowId == ActionID);
+            uint adjusted = 0;
+
+            
+            adjusted = AM->GetAdjustedActionId(ActionID);
+
             if (action == default) return (null, null);
-            var applicableActions = Stacks.Where(entry => entry.BaseAction == action);
+            var applicableActions = Stacks.Where(entry => entry.BaseAction.RowId == action.RowId || entry.BaseAction.RowId == adjusted || AM->GetAdjustedActionId(entry.BaseAction.RowId) == adjusted);
+            
             MoActionStack stackToUse = null;
             foreach (var entry in applicableActions)
             {
@@ -228,8 +222,10 @@ namespace MOAction
                 else if (keyState[entry.Modifier])
                 {
                     stackToUse = entry;
+                    break;
                 }
             }
+            
             if (stackToUse == null)
             {
                 return (null, null);
@@ -288,28 +284,35 @@ namespace MOAction
                         else if (action.MaxCharges > 0 || (action.CooldownGroup != 0 && action.AdditionalCooldownGroup != 0))
                         {
                             if (AvailableCharges(action) == 0) return false;
-                            
                         }
                     }
                     if (Configuration.RangeCheck)
                     {
-                        if (UnorthodoxFriendly.Contains((uint)action.RowId))
-                        {
-                            if (a.YalmDistanceX > 30) return false;
-                        }
-                        else if ((byte)action.Range < a.YalmDistanceX) return false;
+                        uint err;
+                        var player = clientState.LocalPlayer;
+                        var player_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)player.Address;
+                        var target_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)a.Address;
+                        err = ActionManager.fpGetActionInRangeOrLoS(action.RowId, player_ptr, target_ptr);
+                        if (action.TargetArea) return true;
+                        else if (err != 0 && err != 565) return false;
                     }
-                    if (a.ObjectKind == ObjectKind.Player) return action.CanTargetFriendly || action.CanTargetParty 
-                            || action.CanTargetSelf
-                            || action.RowId == 17055 || action.RowId == 7443;
+                    if (a.ObjectKind == ObjectKind.Player) return action.CanTargetFriendly ||
+                            action.CanTargetParty ||
+                            action.CanTargetSelf ||
+                            action.TargetArea ||
+                            action.RowId == 17055 || action.RowId == 7443;
                     if (a.ObjectKind == ObjectKind.BattleNpc)
                     {
                         BattleNpc b = (BattleNpc)a;
-                        if (b.BattleNpcKind != BattleNpcSubKind.Enemy) return action.CanTargetFriendly || action.CanTargetParty
-                                || action.CanTargetSelf
-                                || UnorthodoxFriendly.Contains((uint)action.RowId);
+                        if (b.BattleNpcKind != BattleNpcSubKind.Enemy) return action.CanTargetFriendly || 
+                                action.CanTargetParty ||
+                                action.CanTargetSelf ||
+                                action.TargetArea ||
+                                UnorthodoxFriendly.Contains((uint)action.RowId);
                     }
-                    return action.CanTargetHostile || UnorthodoxHostile.Contains((uint)action.RowId);
+                    return action.CanTargetHostile || 
+                        action.TargetArea ||
+                        UnorthodoxHostile.Contains((uint)action.RowId);
                 }
             }
             return false;
