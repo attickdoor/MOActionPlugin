@@ -425,7 +425,7 @@ namespace MOAction
         {
             ImGui.SetNextWindowSize(new Vector2(800, 800) * ImGuiHelpers.GlobalScale, ImGuiCond.Once);
             ImGui.Begin("Action stack setup", ref isImguiMoSetupOpen,
-                ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar);
+                ImGuiWindowFlags.NoCollapse);
             ImGui.Text("This window allows you to set up your action stacks.");
             ImGui.Text("What is an action stack? ");
             ImGui.SameLine();
@@ -469,8 +469,7 @@ namespace MOAction
                     ImGui.EndPopup();
                 }
             }
-            ImGui.BeginChild("scrolling", new Vector2(0, (ImGui.GetWindowSize().Y - 200) * ImGuiHelpers.GlobalScale), true, ImGuiWindowFlags.NoScrollbar);
-            ImGui.PushID("Sorted Stacks");
+            ImGui.BeginChild("scrolling", new Vector2(0, -(25 + ImGui.GetStyle().ItemSpacing.Y) * ImGuiHelpers.GlobalScale), true);
 
             // sorted stacks are grouped by job.
             ImGui.PushID("Sorted Stacks");
