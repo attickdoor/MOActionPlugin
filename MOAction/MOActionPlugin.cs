@@ -579,7 +579,10 @@ namespace MOAction
                 {
                     TargetType targ = TargetTypes.FirstOrDefault(x => x.TargetName == stackEntry.Item1);
                     if (targ == default) targ = GroundTargetTypes[0];
-                    entries.Add(new(applicableActions.First(x => x.RowId == stackEntry.Item2), targ));
+                    var action1 = applicableActions.FirstOrDefault(x => x.RowId == stackEntry.Item2);
+                    if (action1 == default)
+                        continue;
+                    entries.Add(new(action1, targ));
                 }
                 MoActionStack tmp = new(action, entries);
                 tmp.Job = job;
