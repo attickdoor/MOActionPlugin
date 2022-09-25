@@ -41,7 +41,7 @@ namespace MOAction
         private GetGroupTimerDelegate getGroupTimer;
 
         public List<MoActionStack> Stacks { get; set; }
-        private IEnumerable<Lumina.Excel.GeneratedSheets.Action> RawActions;
+        private Lumina.Excel.ExcelSheet<Lumina.Excel.GeneratedSheets.Action> RawActions;
 
         public IntPtr fieldMOLocation;
         public IntPtr focusTargLocation;
@@ -203,13 +203,11 @@ namespace MOAction
 
         private unsafe (Lumina.Excel.GeneratedSheets.Action action, GameObject target) GetActionTarget(uint ActionID, uint ActionType)
         {
-            var action = RawActions.FirstOrDefault(x => x.RowId == ActionID);
-            uint adjusted = 0;
-
+            var action = RawActions.GetRow(ActionID);
             
-            adjusted = AM->GetAdjustedActionId(ActionID);
+            uint adjusted = AM->GetAdjustedActionId(ActionID);
 
-            if (action == default) return (null, null);
+            if (action == null) return (null, null);
             var applicableActions = Stacks.Where(entry => entry.BaseAction.RowId == action.RowId || entry.BaseAction.RowId == adjusted || AM->GetAdjustedActionId(entry.BaseAction.RowId) == adjusted);
             
             MoActionStack stackToUse = null;
@@ -257,65 +255,54 @@ namespace MOAction
             if (targ.Target == null || targ.Action == null) return false;
             
             var action = targ.Action;
-            var action2 = AM->GetAdjustedActionId(action.RowId);
-            action = RawActions.First(x => x.RowId == action2);
-            var target = targ.Target.GetTargetActorId();
-
-            // ground target "at my mouse cursor"
-            if (!targ.Target.ObjectNeeded)
+            var target = targ.Target.GetTarget();
+            if (target == null)
             {
-                return true;
+                return !targ.Target.ObjectNeeded;
             }
-            
-            foreach (GameObject a in objectTable)            
+         
+            // Check if ability is on CD or not (charges are fun!)
+            unsafe
             {
-                if (a != null && a.ObjectId == target)
+                if (action.ActionCategory.Value.RowId == (uint)ActionType.Ability && action.MaxCharges == 0)
                 {
-                    // Check if ability is on CD or not (charges are fun!)
-                    unsafe
+                    if (AM->IsRecastTimerActive((ActionType)actionType, action.RowId))
                     {
-                        if (action.ActionCategory.Value.RowId == (uint)ActionType.Ability && action.MaxCharges == 0)
-                        {
-                            if (AM->IsRecastTimerActive((ActionType)actionType, action.RowId))
-                            {
-                                return false;
-                            }
-                        }
-                        else if (action.MaxCharges > 0 || (action.CooldownGroup != 0 && action.AdditionalCooldownGroup != 0))
-                        {
-                            if (AvailableCharges(action) == 0) return false;
-                        }
+                        return false;
                     }
-                    if (Configuration.RangeCheck)
-                    {
-                        uint err;
-                        var player = clientState.LocalPlayer;
-                        var player_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)player.Address;
-                        var target_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)a.Address;
-                        err = ActionManager.fpGetActionInRangeOrLoS(action.RowId, player_ptr, target_ptr);
-                        if (action.TargetArea) return true;
-                        else if (err != 0 && err != 565) return false;
-                    }
-                    if (a.ObjectKind == ObjectKind.Player) return action.CanTargetFriendly ||
-                            action.CanTargetParty ||
-                            action.CanTargetSelf ||
-                            action.TargetArea ||
-                            action.RowId == 17055 || action.RowId == 7443;
-                    if (a.ObjectKind == ObjectKind.BattleNpc)
-                    {
-                        BattleNpc b = (BattleNpc)a;
-                        if (b.BattleNpcKind != BattleNpcSubKind.Enemy) return action.CanTargetFriendly || 
-                                action.CanTargetParty ||
-                                action.CanTargetSelf ||
-                                action.TargetArea ||
-                                UnorthodoxFriendly.Contains((uint)action.RowId);
-                    }
-                    return action.CanTargetHostile || 
-                        action.TargetArea ||
-                        UnorthodoxHostile.Contains((uint)action.RowId);
+                }
+                else if (action.MaxCharges > 0 || (action.CooldownGroup != 0 && action.AdditionalCooldownGroup != 0))
+                {
+                    if (AvailableCharges(action) == 0) return false;
                 }
             }
-            return false;
+            if (Configuration.RangeCheck)
+            { 
+                var player = clientState.LocalPlayer;
+                var player_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)player.Address;
+                var target_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)target.Address;
+                
+                uint err = ActionManager.fpGetActionInRangeOrLoS(action.RowId, player_ptr, target_ptr);
+                if (action.TargetArea) return true;
+                else if (err != 0 && err != 565) return false;
+            }
+            if (target.ObjectKind == ObjectKind.Player) return action.CanTargetFriendly ||
+                    action.CanTargetParty ||
+                    action.CanTargetSelf ||
+                    action.TargetArea ||
+                    action.RowId == 17055 || action.RowId == 7443;
+            if (target.ObjectKind == ObjectKind.BattleNpc)
+            {
+                BattleNpc b = (BattleNpc)target;
+                if (b.BattleNpcKind != BattleNpcSubKind.Enemy) return action.CanTargetFriendly || 
+                        action.CanTargetParty ||
+                        action.CanTargetSelf ||
+                        action.TargetArea ||
+                        UnorthodoxFriendly.Contains((uint)action.RowId);
+            }
+            return action.CanTargetHostile || 
+                action.TargetArea ||
+                UnorthodoxHostile.Contains((uint)action.RowId);
         }
 
         public GameObject GetGuiMoPtr()
