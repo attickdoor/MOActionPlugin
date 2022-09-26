@@ -255,6 +255,8 @@ namespace MOAction
             if (targ.Target == null || targ.Action == null) return false;
             
             var action = targ.Action;
+            action = RawActions.GetRow(AM->GetAdjustedActionId(targ.Action.RowId));
+            if (action == null) return false; // just in case
             var target = targ.Target.GetTarget();
             if (target == null)
             {
