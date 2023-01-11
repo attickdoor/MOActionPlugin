@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "Author": "attick",
   "Name": "Mouseover Action",
   "Punchline": "Mo' actions no problems",
@@ -10,4 +11,13 @@
   "Tags": ["Mouseover", "Macro"],
   "AcceptsFeedback": false,
   "DalamudApiLevel": 6
+=======
+	"Author": "attick",
+	"Name": "Mouseover Action",
+	"Punchline": "Mo' actions no problems",
+	"Description": "This plugin lets you target friends or enemies like a macro, without the clunkiness of a macro. /pmoaction opens the configuration.",
+	"RepoUrl": "https://github.com/attickdoor/MOActionPlugin",
+	"Tags": [ "Mouseover", "Macro" ],
+	"AcceptsFeedback": true
+>>>>>>> 7b9bbb9b8b81cfd4825da070df555fbc6896cf9e
 }

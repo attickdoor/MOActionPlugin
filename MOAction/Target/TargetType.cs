@@ -28,7 +28,7 @@ namespace MOAction.Target
             ObjectNeeded = objneed;
         }
 
-        public abstract uint GetTargetActorId();
+        public abstract GameObject GetTarget();
         public abstract bool IsTargetValid();
 
         public override string ToString() => TargetName;
