@@ -5,6 +5,5 @@
 	"Description": "This plugin lets you target friends or enemies like a macro, without the clunkiness of a macro. /pmoaction opens the configuration.",
 	"RepoUrl": "https://github.com/attickdoor/MOActionPlugin",
 	"Tags": [ "Mouseover", "Macro" ],
-	"AcceptsFeedback": true,
-	"DalamudApiLevel": 7
+	"AcceptsFeedback": true
 }

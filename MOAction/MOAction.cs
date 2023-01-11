@@ -120,7 +120,7 @@ namespace MOAction
                 var uiModule = framework->GetUiModule();
                 PM = uiModule->GetPronounModule();
                 AM = ActionManager.Instance();
-                getGroupTimer = Marshal.GetDelegateForFunctionPointer<GetGroupTimerDelegate>((IntPtr)ActionManager.fpGetRecastGroupDetail);
+                getGroupTimer = Marshal.GetDelegateForFunctionPointer<GetGroupTimerDelegate>((IntPtr)ActionManager.Addresses.GetRecastGroupDetail.Value);
             }
             catch (Exception e) {
                 PluginLog.Log(e.Message);
@@ -138,7 +138,7 @@ namespace MOAction
         private unsafe void HookUseAction()
         {
             SafeMemory.WriteBytes(Address.GtQueuePatch, new byte[] { 0xEB });
-            requestActionHook = Hook<OnRequestActionDetour>.FromAddress((IntPtr)ActionManager.fpUseAction, new OnRequestActionDetour(HandleRequestAction));
+            requestActionHook = Hook<OnRequestActionDetour>.FromAddress((IntPtr)ActionManager.Addresses.UseAction.Value, new OnRequestActionDetour(HandleRequestAction));
             requestActionHook.Enable();
         }
 
@@ -284,7 +284,7 @@ namespace MOAction
                 var player_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)player.Address;
                 var target_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)target.Address;
                 
-                uint err = ActionManager.fpGetActionInRangeOrLoS(action.RowId, player_ptr, target_ptr);
+                uint err = ActionManager.GetActionInRangeOrLoS(action.RowId, player_ptr, target_ptr);
                 if (action.TargetArea) return true;
                 else if (err != 0 && err != 565) return false;
             }
