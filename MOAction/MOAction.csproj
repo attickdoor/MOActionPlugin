@@ -1,28 +1,26 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-<<<<<<< HEAD
-=======
     <TargetFramework>net7.0-windows</TargetFramework>
->>>>>>> 7b9bbb9b8b81cfd4825da070df555fbc6896cf9e
     <AssemblyTitle>MOActionPlugin</AssemblyTitle>
     <Product>MOActionPlugin</Product>
     <Description>This plugin allows for actions to be used on mouseover targets without a macro.</Description>
     <Version>4.2.4</Version>
     <Copyright>Copyleft attick 2021 baybeeee</Copyright>
-<<<<<<< HEAD
     <PackageProjectUrl>https://github.com/attickdoor/MOActionPlugin</PackageProjectUrl>
+    <AssemblyVersion>4.2.13</AssemblyVersion>
+    <FileVersion>4.2.13</FileVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <AppDesignerFolder>Properties.bak</AppDesignerFolder>
   </PropertyGroup>
-
-  <PropertyGroup>
-    <TargetFramework>net5.0-windows</TargetFramework>
-    <Platforms>x64</Platforms>
-    <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
-=======
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugType>full</DebugType>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
     <AssemblyVersion>4.2.12</AssemblyVersion>
     <FileVersion>4.2.12</FileVersion>
->>>>>>> 7b9bbb9b8b81cfd4825da070df555fbc6896cf9e
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
@@ -37,39 +35,6 @@
     <BaseOutputPath>$(AppData)\XIVLauncher\devPlugins\MOActionPlugin\</BaseOutputPath>
   </PropertyGroup>
 
-<<<<<<< HEAD
-  <ItemGroup>
-    <PackageReference Include="DalamudPackager" Version="2.1.7" />
-    <PackageReference Include="System.Numerics.Vectors" Version="4.5.0" />
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>$(DalamudLibPath)Newtonsoft.Json.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Dalamud">
-      <HintPath>$(DalamudLibPath)Dalamud.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="ImGui.NET">
-      <HintPath>$(DalamudLibPath)ImGui.NET.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Lumina">
-      <HintPath>$(DalamudLibPath)Lumina.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Lumina.Excel">
-      <HintPath>$(DalamudLibPath)Lumina.Excel.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="FFXIVClientStructs">
-      <HintPath>$(DalamudLibPath)FFXIVClientStructs.dll</HintPath>
-    </Reference>
-    <Reference Include="ImGuiScene">
-      <HintPath>$(DalamudLibPath)ImGuiScene.dll</HintPath>
-    </Reference>
-    <Reference Include="SDL2-CS">
-      <HintPath>$(DalamudLibPath)SDL2-CS.dll</HintPath>
-=======
   <PropertyGroup>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
@@ -79,7 +44,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DalamudPackager" Version="2.1.8" />
+    <PackageReference Include="DalamudPackager" Version="2.1.10" />
     <Reference Include="FFXIVClientStructs">
       <HintPath>$(DalamudLibPath)FFXIVClientStructs.dll</HintPath>
       <Private>false</Private>
@@ -107,7 +72,6 @@
     <Reference Include="Lumina.Excel">
       <HintPath>$(DalamudLibPath)Lumina.Excel.dll</HintPath>
       <Private>false</Private>
->>>>>>> 7b9bbb9b8b81cfd4825da070df555fbc6896cf9e
     </Reference>
   </ItemGroup>
 </Project>
