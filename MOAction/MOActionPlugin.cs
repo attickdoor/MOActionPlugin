@@ -41,6 +41,7 @@ namespace MOAction
         private List<TargetType> GroundTargetTypes;
         private List<MoActionStack> NewStacks;
         private Dictionary<string, HashSet<MoActionStack>> SavedStacks;
+        private Dictionary<string, List<MoActionStack>> SortedStacks;
     
         private bool firstTimeUpgrade = false;
         private bool rangeCheck;
@@ -85,6 +86,7 @@ namespace MOAction
             JobAbbreviations.Sort((x, y) => x.Abbreviation.ToString().CompareTo(y.Abbreviation.ToString()));
             NewStacks = new();
             SavedStacks = new();
+            SortedStacks = new();
             var x = dataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>().Where(row => row.IsPlayerAction && !row.IsPvP && row.ClassJobLevel > 0).ToList();
             foreach (var a in x)
             {
@@ -171,6 +173,12 @@ namespace MOAction
             {
                 var tmpstacks = RebuildStacks(Configuration.Stacks);
                 SavedStacks = SortStacks(tmpstacks);
+                foreach(var (k, v) in SavedStacks)
+                {
+                    var tmp = v.ToList();
+                    tmp.Sort();
+                    SortedStacks[k] = tmp;
+                }
             }
             rangeCheck = Configuration.RangeCheck;
             mouseClamp = Configuration.MouseClamp;
@@ -356,6 +364,7 @@ namespace MOAction
                             if (ImGui.Button ("Delete Stack"))
                             {
                                 list.Remove(entry);
+                                SavedStacks[entry.GetJob(dataManager)].Remove(entry);
                                 i--;
                             }
                         }
@@ -416,7 +425,7 @@ namespace MOAction
         {
             ImGui.SetNextWindowSize(new Vector2(800, 800) * ImGuiHelpers.GlobalScale, ImGuiCond.Once);
             ImGui.Begin("Action stack setup", ref isImguiMoSetupOpen,
-                ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar);
+                ImGuiWindowFlags.NoCollapse);
             ImGui.Text("This window allows you to set up your action stacks.");
             ImGui.Text("What is an action stack? ");
             ImGui.SameLine();
@@ -460,8 +469,7 @@ namespace MOAction
                     ImGui.EndPopup();
                 }
             }
-            ImGui.BeginChild("scrolling", new Vector2(0, (ImGui.GetWindowSize().Y - 200) * ImGuiHelpers.GlobalScale), true, ImGuiWindowFlags.NoScrollbar);
-            ImGui.PushID("Sorted Stacks");
+            ImGui.BeginChild("scrolling", new Vector2(0, -(25 + ImGui.GetStyle().ItemSpacing.Y) * ImGuiHelpers.GlobalScale), true);
 
             // sorted stacks are grouped by job.
             ImGui.PushID("Sorted Stacks");
@@ -482,7 +490,7 @@ namespace MOAction
                         CopyToClipboard(entries.ToList());
                     }
                     ImGui.Indent();
-                    DrawConfigForList(SavedStacks[jobName]);
+                    DrawConfigForList(SortedStacks[jobName]);
                     
                     ImGui.Unindent();
                 }
@@ -507,7 +515,16 @@ namespace MOAction
             ImGui.SameLine();
             if (ImGui.Button("New Stack"))
             {
-                NewStacks.Add(new(null, new()));
+                if (clientState.LocalPlayer != null)
+                {
+                    MoActionStack stack = new(null, null);
+                    stack.Job = clientState.LocalPlayer.ClassJob.Id.ToString();
+                    NewStacks.Add(stack);
+                }
+                else
+                {
+                    NewStacks.Add(new(null, new()));
+                }
             }
             ImGui.End();
         }
@@ -520,6 +537,21 @@ namespace MOAction
                     SavedStacks[x.GetJob(dataManager)].Add(x);
             }
             NewStacks.Clear();
+            /*
+            foreach (var (k, v) in SortedStacks)
+            {
+                foreach (var tmp in v)
+                    SavedStacks[k].Add(tmp);
+                SortedStacks[k].Sort();
+            }
+            */
+            foreach (var (k, v) in SavedStacks)
+            {
+                var tmp = v.ToList();
+                tmp.Sort();
+                SortedStacks[k] = tmp;
+            }
+            
         }     
         
         private void UpdateConfig()
@@ -547,7 +579,10 @@ namespace MOAction
                 {
                     TargetType targ = TargetTypes.FirstOrDefault(x => x.TargetName == stackEntry.Item1);
                     if (targ == default) targ = GroundTargetTypes[0];
-                    entries.Add(new(applicableActions.First(x => x.RowId == stackEntry.Item2), targ));
+                    var action1 = applicableActions.FirstOrDefault(x => x.RowId == stackEntry.Item2);
+                    if (action1 == default)
+                        continue;
+                    entries.Add(new(action1, targ));
                 }
                 MoActionStack tmp = new(action, entries);
                 tmp.Job = job;
@@ -563,6 +598,8 @@ namespace MOAction
             moAction.Dispose();
 
             commandManager.RemoveHandler("/pmoaction");
+
+            //pluginInterface.Dispose();
         }
 
         private void OnCommandDebugMouseover(string command, string arguments)

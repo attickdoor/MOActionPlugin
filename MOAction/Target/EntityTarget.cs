@@ -12,13 +12,13 @@ namespace MOAction.Target
     {
         public EntityTarget(PtrFunc func, string name) : base(func, name) { }
         public EntityTarget(PtrFunc func, string name, bool objneed) : base(func, name, objneed) { }
-        public override uint GetTargetActorId()
+        public override GameObject GetTarget()
         {
             GameObject obj = getPtr();
             if (IsTargetValid())
-                return obj.ObjectId;
+                return obj;
                 //return (uint)Marshal.ReadInt32(ptr + 0x74);
-            return 0;
+            return null;
         }
 
         public override bool IsTargetValid()
