@@ -109,6 +109,7 @@ namespace MOAction
             UnorthodoxFriendly.Add(7443);
             //These are NPC classified as BattleNpc and Enemy, where healing actions work on
             HealableBattleNpcs.Add(3054); //Paiyo Reiyo - Tam Tara Deepcroft (hard)
+            HealableBattleNpcs.Add(13117); //Haurchefant - Dragon song Reprise Ultimate
         }
 
         public void SetConfig(MOActionConfiguration config)
