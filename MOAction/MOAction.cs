@@ -50,6 +50,7 @@ namespace MOAction
 
         private HashSet<uint> UnorthodoxFriendly;
         private HashSet<uint> UnorthodoxHostile;
+        private HashSet<uint> HealableBattleNpcs;
 
         public HashSet<ulong> enabledActions;
 
@@ -81,7 +82,7 @@ namespace MOAction
             fieldMOLocation = Address.FieldMO;
             focusTargLocation = Address.FocusTarg;
             regularTargLocation = Address.RegularTarg;
-            
+
             dataManager = datamanager;
 
             RawActions = dataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>();
@@ -96,15 +97,18 @@ namespace MOAction
 
             PluginLog.Log("===== M O A C T I O N =====");
             PluginLog.Log("SetUiMouseoverEntityId address {SetUiMouseoverEntityId}", Address.SetUiMouseoverEntityId);
-            
+
             uiMoEntityIdHook = Hook<OnSetUiMouseoverEntityId>.FromAddress(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId));
 
             enabledActions = new();
             UnorthodoxFriendly = new();
             UnorthodoxHostile = new();
+            HealableBattleNpcs = new();
             UnorthodoxHostile.Add(3575);
             UnorthodoxFriendly.Add(17055);
             UnorthodoxFriendly.Add(7443);
+            //These are NPC classified as BattleNpc and Enemy, where healing actions work on
+            HealableBattleNpcs.Add(1073745861); //Paiyo Reiyo - Tam Tara Deepcroft (hard)
         }
 
         public void SetConfig(MOActionConfiguration config)
@@ -122,7 +126,8 @@ namespace MOAction
                 AM = ActionManager.Instance();
                 getGroupTimer = Marshal.GetDelegateForFunctionPointer<GetGroupTimerDelegate>((IntPtr)ActionManager.Addresses.GetRecastGroupDetail.Value);
             }
-            catch (Exception e) {
+            catch (Exception e)
+            {
                 PluginLog.Log(e.Message);
                 PluginLog.Log(e.StackTrace);
                 PluginLog.Log(e.InnerException.ToString());
@@ -155,7 +160,7 @@ namespace MOAction
             {
                 requestActionHook.Dispose();
                 uiMoEntityIdHook.Dispose();
-                
+
                 SafeMemory.WriteBytes(Address.GtQueuePatch, new byte[] { 0x74 });
             }
         }
@@ -180,13 +185,13 @@ namespace MOAction
                 return requestActionHook.Original(param_1, actionType, actionID, param_4, param_5, param_6, param_7, param_8);
             }
             var (action, target) = GetActionTarget((uint)actionID, actionType);
-            
+
             if (action == null) return requestActionHook.Original(param_1, actionType, actionID, param_4, param_5, param_6, param_7, param_8);
 
             // Earthly Star is the only GT that changes to a different action.
             if (action.RowId == 7439 && clientState.LocalPlayer.StatusList.Any(x => x.StatusId == 1248 || x.StatusId == 1224))
                 return requestActionHook.Original(param_1, actionType, actionID, param_4, param_5, param_6, param_7, param_8);
-            
+
 
             long objectId = target == null ? 0xE0000000 : target.ObjectId;
 
@@ -204,12 +209,12 @@ namespace MOAction
         private unsafe (Lumina.Excel.GeneratedSheets.Action action, GameObject target) GetActionTarget(uint ActionID, uint ActionType)
         {
             var action = RawActions.GetRow(ActionID);
-            
+
             uint adjusted = AM->GetAdjustedActionId(ActionID);
 
             if (action == null) return (null, null);
             var applicableActions = Stacks.Where(entry => entry.BaseAction.RowId == action.RowId || entry.BaseAction.RowId == adjusted || AM->GetAdjustedActionId(entry.BaseAction.RowId) == adjusted);
-            
+
             MoActionStack stackToUse = null;
             foreach (var entry in applicableActions)
             {
@@ -223,7 +228,7 @@ namespace MOAction
                     break;
                 }
             }
-            
+
             if (stackToUse == null)
             {
                 return (null, null);
@@ -247,13 +252,13 @@ namespace MOAction
             else
                 timer = GetGroupRecastTimer(action.CooldownGroup);
             if (action.MaxCharges == 0) return timer->IsActive ^ 1;
-            return (int)((action.MaxCharges+1) * (timer->Elapsed / timer->Total));
+            return (int)((action.MaxCharges + 1) * (timer->Elapsed / timer->Total));
         }
 
         private unsafe bool CanUseAction(StackEntry targ, uint actionType)
         {
             if (targ.Target == null || targ.Action == null) return false;
-            
+
             var action = targ.Action;
             action = RawActions.GetRow(AM->GetAdjustedActionId(targ.Action.RowId));
             if (action == null) return false; // just in case
@@ -262,7 +267,7 @@ namespace MOAction
             {
                 return !targ.Target.ObjectNeeded;
             }
-         
+
             // Check if ability is on CD or not (charges are fun!)
             unsafe
             {
@@ -279,11 +284,11 @@ namespace MOAction
                 }
             }
             if (Configuration.RangeCheck)
-            { 
+            {
                 var player = clientState.LocalPlayer;
                 var player_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)player.Address;
                 var target_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)target.Address;
-                
+
                 uint err = ActionManager.GetActionInRangeOrLoS(action.RowId, player_ptr, target_ptr);
                 if (action.TargetArea) return true;
                 else if (err != 0 && err != 565) return false;
@@ -296,20 +301,22 @@ namespace MOAction
             if (target.ObjectKind == ObjectKind.BattleNpc)
             {
                 BattleNpc b = (BattleNpc)target;
-                PluginLog.Debug("The subkind was: " + b.BattleNpcKind + "with name: " + b.Name);
-                //Titan's heart and Sunken temple of Qarn Golem soulstone (npcs without a hitbox) returned 1 on battleNpcKind, 
-                //this specific edge case should default to the hostile action in the actionstack instead of CanTargetFriendly
-                //some more testing later in solm al and baram's mettle, battleNpcKind 1 means weak point/Battle npc part
-                if (b.BattleNpcKind != BattleNpcSubKind.Enemy && ((int)b.BattleNpcKind) != 1) {
-                    return action.CanTargetFriendly || 
+                PluginLog.Debug("The subkind was: " + b.BattleNpcKind + " with name: " + b.Name);
+                PluginLog.Debug("" + b.ObjectId);
+                if (
+                     !(b.BattleNpcKind == BattleNpcSubKind.Enemy || ((int)b.BattleNpcKind) == 1) //Soon The BattleNpcKind Enum will get a new enum for 1: Weak spot/Battle npc part
+                        || HealableBattleNpcs.Contains((uint)b.ObjectId) //started keeping a list of uint's of NPC's that are battle npc enemies, but can be healed
+                        )
+                {
+                    return action.CanTargetFriendly ||
                         action.CanTargetParty ||
                         action.CanTargetSelf ||
                         action.TargetArea ||
                         UnorthodoxFriendly.Contains((uint)action.RowId);
                 }
             }
-            PluginLog.Debug("Objectkind was: "+ target.ObjectKind + "with name: "+ target.Name);
-            return action.CanTargetHostile || 
+            PluginLog.Debug("Objectkind was: " + target.ObjectKind + "with name: " + target.Name);
+            return action.CanTargetHostile ||
                 action.TargetArea ||
                 UnorthodoxHostile.Contains((uint)action.RowId);
         }
