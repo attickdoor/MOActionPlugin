@@ -108,7 +108,7 @@ namespace MOAction
             UnorthodoxFriendly.Add(17055);
             UnorthodoxFriendly.Add(7443);
             //These are NPC classified as BattleNpc and Enemy, where healing actions work on
-            HealableBattleNpcs.Add(1073745861); //Paiyo Reiyo - Tam Tara Deepcroft (hard)
+            HealableBattleNpcs.Add(3054); //Paiyo Reiyo - Tam Tara Deepcroft (hard)
         }
 
         public void SetConfig(MOActionConfiguration config)
@@ -302,10 +302,10 @@ namespace MOAction
             {
                 BattleNpc b = (BattleNpc)target;
                 PluginLog.Debug("The subkind was: " + b.BattleNpcKind + " with name: " + b.Name);
-                PluginLog.Debug("" + b.ObjectId);
+                PluginLog.Debug("DataId " + b.DataId);
                 if (
                      !(b.BattleNpcKind == BattleNpcSubKind.Enemy || ((int)b.BattleNpcKind) == 1) //Soon The BattleNpcKind Enum will get a new enum for 1: Weak spot/Battle npc part
-                        || HealableBattleNpcs.Contains((uint)b.ObjectId) //started keeping a list of uint's of NPC's that are battle npc enemies, but can be healed
+                        || HealableBattleNpcs.Contains((uint)b.DataId) //started keeping a list of uint's of NPC's that are battle npc enemies, but can be healed
                         )
                 {
                     return action.CanTargetFriendly ||
