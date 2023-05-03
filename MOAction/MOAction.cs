@@ -306,7 +306,7 @@ namespace MOAction
                 PluginLog.Debug("The subkind was: " + b.BattleNpcKind + " with name: " + b.Name);
                 PluginLog.Debug("DataId " + b.DataId);
                 //Soon The BattleNpcKind Enum will get a new enum for 1: Weak spot/Battle npc part
-                if (!(b.BattleNpcKind == BattleNpcSubKind.Enemy || ((int)b.BattleNpcKind) == 1))
+                if (!(b.BattleNpcKind == BattleNpcSubKind.Enemy || b.BattleNpcKind == BattleNpcSubKind.BattleNpcPart);
                 {
                     return action.CanTargetFriendly ||
                         action.CanTargetParty ||
@@ -325,7 +325,7 @@ namespace MOAction
                         UnorthodoxFriendly.Contains((uint)action.RowId);
             }
             
-            PluginLog.Debug("Objectkind was: " + target.ObjectKind + "with name: " + target.Name);
+            PluginLog.Debug("Objectkind was: " + target.ObjectKind + " with name: " + target.Name);
             return action.CanTargetHostile ||
                 action.TargetArea ||
                 UnorthodoxHostile.Contains((uint)action.RowId);
