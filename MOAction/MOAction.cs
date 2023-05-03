@@ -298,16 +298,15 @@ namespace MOAction
                     action.CanTargetParty ||
                     action.CanTargetSelf ||
                     action.TargetArea ||
-                    action.RowId == 17055 || action.RowId == 7443;
+                    UnorthodoxFriendly.Contains((uint)action.RowId);
+
             if (target.ObjectKind == ObjectKind.BattleNpc)
             {
                 BattleNpc b = (BattleNpc)target;
                 PluginLog.Debug("The subkind was: " + b.BattleNpcKind + " with name: " + b.Name);
                 PluginLog.Debug("DataId " + b.DataId);
-                if (
-                     !(b.BattleNpcKind == BattleNpcSubKind.Enemy || ((int)b.BattleNpcKind) == 1) //Soon The BattleNpcKind Enum will get a new enum for 1: Weak spot/Battle npc part
-                        || HealableBattleNpcs.Contains((uint)b.DataId) //started keeping a list of uint's of NPC's that are battle npc enemies, but can be healed
-                        )
+                //Soon The BattleNpcKind Enum will get a new enum for 1: Weak spot/Battle npc part
+                if (!(b.BattleNpcKind == BattleNpcSubKind.Enemy || ((int)b.BattleNpcKind) == 1))
                 {
                     return action.CanTargetFriendly ||
                         action.CanTargetParty ||
@@ -316,6 +315,16 @@ namespace MOAction
                         UnorthodoxFriendly.Contains((uint)action.RowId);
                 }
             }
+             //Custom case for specific npcs that are healable non-party frame existing
+            if(HealableBattleNpcs.Contains(target.DataId)){
+                PluginLog.Debug("Custom NPC case for a healable NPC, ID: " + target.DataId);
+                  return action.CanTargetFriendly ||
+                        action.CanTargetParty ||
+                        action.CanTargetSelf ||
+                        action.TargetArea ||
+                        UnorthodoxFriendly.Contains((uint)action.RowId);
+            }
+            
             PluginLog.Debug("Objectkind was: " + target.ObjectKind + "with name: " + target.Name);
             return action.CanTargetHostile ||
                 action.TargetArea ||
