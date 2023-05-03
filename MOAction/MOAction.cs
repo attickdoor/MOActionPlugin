@@ -296,11 +296,16 @@ namespace MOAction
             if (target.ObjectKind == ObjectKind.BattleNpc)
             {
                 BattleNpc b = (BattleNpc)target;
-                if (b.BattleNpcKind != BattleNpcSubKind.Enemy) return action.CanTargetFriendly || 
+                //Titan's heart and Sunken temple of Qarn Golem soulstone (npcs without a hitbox) returned 1 on battleNpcKind, 
+                //this specific edge case should default to the hostile action in the actionstack instead of CanTargetFriendly
+                if (b.BattleNpcKind != BattleNpcSubKind.Enemy && ((int)b.BattleNpcKind) != 1) {
+                    PluginLog.Debug("The subkind was: " + b.BattleNpcKind);
+                    return action.CanTargetFriendly || 
                         action.CanTargetParty ||
                         action.CanTargetSelf ||
                         action.TargetArea ||
                         UnorthodoxFriendly.Contains((uint)action.RowId);
+                }
             }
             return action.CanTargetHostile || 
                 action.TargetArea ||
