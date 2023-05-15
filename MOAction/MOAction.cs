@@ -292,7 +292,7 @@ namespace MOAction
                     action.CanTargetParty ||
                     action.CanTargetSelf ||
                     action.TargetArea ||
-                    action.RowId == 17055 || action.RowId == 7443;
+                    UnorthodoxFriendly.Contains((uint)action.RowId);
             if (target.ObjectKind == ObjectKind.BattleNpc)
             {
                 BattleNpc b = (BattleNpc)target;
