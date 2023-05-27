@@ -296,13 +296,15 @@ namespace MOAction
             if (target.ObjectKind == ObjectKind.BattleNpc)
             {
                 BattleNpc b = (BattleNpc)target;
-                if (b.BattleNpcKind != BattleNpcSubKind.Enemy) return action.CanTargetFriendly || 
+                if (!(b.BattleNpcKind == BattleNpcSubKind.Enemy || b.BattleNpcKind == BattleNpcSubKind.BattleNpcPart)){
+                    return action.CanTargetFriendly ||
                         action.CanTargetParty ||
                         action.CanTargetSelf ||
                         action.TargetArea ||
                         UnorthodoxFriendly.Contains((uint)action.RowId);
+                }
             }
-            return action.CanTargetHostile || 
+            return action.CanTargetHostile ||
                 action.TargetArea ||
                 UnorthodoxHostile.Contains((uint)action.RowId);
         }
