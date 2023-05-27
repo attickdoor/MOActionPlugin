@@ -353,7 +353,7 @@ namespace MOAction
                             // Add new entry to bottom of stack.
                             if (ImGui.Button("Add new stack entry"))
                             {
-                                entry.Entries.Add(new(entry.BaseAction, null));
+                                entry.Entries.Add(new(entry.BaseAction, TargetTypes[0]));
                             }
                             ImGui.SameLine();
                             if (ImGui.Button("Copy stack to clipboard"))
@@ -592,6 +592,7 @@ namespace MOAction
 
             return toReturn;
         }
+
         public void Dispose()
         {
             moAction.Dispose();
