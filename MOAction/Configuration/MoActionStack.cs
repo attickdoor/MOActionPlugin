@@ -1,10 +1,8 @@
-﻿using Dalamud.Data;
-using Dalamud.Game.ClientState.Keys;
+﻿using Dalamud.Game.ClientState.Keys;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Dalamud.Plugin.Services;
 
 namespace MOAction.Configuration
 {
@@ -60,7 +58,7 @@ namespace MOAction.Configuration
             return BaseAction.RowId == x.BaseAction.RowId && Job == x.Job;
         }
 
-        public string GetJob(DataManager dm)
+        public string GetJob(IDataManager dm)
         {
             if (Job == "Unset Job") return Job;
             return dm.GetExcelSheet<Lumina.Excel.GeneratedSheets.ClassJob>().First(x => x.RowId.ToString() == Job).Abbreviation;

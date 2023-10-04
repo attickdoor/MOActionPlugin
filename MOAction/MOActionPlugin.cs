@@ -7,16 +7,13 @@ using System.Numerics;
 using ImGuiNET;
 using MOAction.Target;
 using MOAction.Configuration;
-using Dalamud.Data;
-using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Keys;
 using System.Diagnostics;
-using SigScanner = Dalamud.Game.SigScanner;
-using Dalamud.Game.Gui;
 using System.Text;
 using Newtonsoft.Json;
-using Dalamud.Interface;
+using Dalamud.Plugin.Services;
+using Dalamud.Game;
 
 namespace MOAction
 {
@@ -42,7 +39,7 @@ namespace MOAction
         private List<MoActionStack> NewStacks;
         private Dictionary<string, HashSet<MoActionStack>> SavedStacks;
         private Dictionary<string, List<MoActionStack>> SortedStacks;
-    
+
         private bool firstTimeUpgrade = false;
         private bool rangeCheck;
         private bool mouseClamp;
@@ -58,13 +55,24 @@ namespace MOAction
 
         private readonly int CURRENT_CONFIG_VERSION = 6;
 
-        private ClientState clientState;
-        private TargetManager targetManager;
-        private DataManager dataManager;
-        private CommandManager commandManager;
-        private SigScanner SigScanner;
+        private IClientState clientState;
+        private ITargetManager targetManager;
+        private IDataManager dataManager;
+        private ICommandManager commandManager;
+        private ISigScanner SigScanner;
 
-        unsafe public MOActionPlugin(DalamudPluginInterface pluginInterface,  CommandManager commands,  DataManager datamanager, GameGui gamegui, KeyState keystate, ObjectTable objects, SigScanner scanner, ClientState clientstate, TargetManager targetmanager)
+        unsafe public MOActionPlugin(DalamudPluginInterface pluginInterface,
+                                    ICommandManager commands,
+                                    IDataManager datamanager,
+                                    IGameGui gamegui,
+                                    IKeyState keystate,
+                                    IObjectTable objects,
+                                    ISigScanner scanner,
+                                    IClientState clientstate,
+                                    ITargetManager targetmanager,
+                                    IPluginLog pluginLog,
+                                    IGameInteropProvider hookprovider
+                                        )
         {
             this.pluginInterface = pluginInterface;
 
@@ -100,7 +108,8 @@ namespace MOAction
                 else if (a.RowId == 3573 || a.RowId == 7385 || a.RowId == 7419)
                     a.TargetArea = false;
                 // Other ground targets have to be able to target anything
-                else if (GroundTargets.Contains(a.RowId)) {
+                else if (GroundTargets.Contains(a.RowId))
+                {
                     a.CanTargetDead = true;
                     a.CanTargetFriendly = true;
                     a.CanTargetHostile = true;
@@ -112,11 +121,19 @@ namespace MOAction
             }
             JobActions = new();
             SortActions();
-            moAction = new MOAction(SigScanner, clientState, dataManager, targetManager, objects, keystate, gamegui);
+            moAction = new MOAction(SigScanner,
+                                    clientState, 
+                                    dataManager, 
+                                    targetManager, 
+                                    objects, 
+                                    keystate, 
+                                    gamegui,
+                                    hookprovider, 
+                                    pluginLog);
 
             foreach (var jobname in JobAbbreviations)
             {
-                JobActions.Add(jobname.Abbreviation, applicableActions.Where(action => action.ClassJobCategory.Value.Name.ToString().Contains(jobname.Name.ToString()) || 
+                JobActions.Add(jobname.Abbreviation, applicableActions.Where(action => action.ClassJobCategory.Value.Name.ToString().Contains(jobname.Name.ToString()) ||
                 action.ClassJobCategory.Value.Name.ToString().Contains(jobname.Abbreviation.ToString())).ToList());
             }
 
@@ -173,7 +190,7 @@ namespace MOAction
             {
                 var tmpstacks = RebuildStacks(Configuration.Stacks);
                 SavedStacks = SortStacks(tmpstacks);
-                foreach(var (k, v) in SavedStacks)
+                foreach (var (k, v) in SavedStacks)
                 {
                     var tmp = v.ToList();
                     tmp.Sort();
@@ -227,7 +244,7 @@ namespace MOAction
             {
                 ImGui.PushID(i);
                 var entry = list.ElementAt(i);
-                if (ImGui.CollapsingHeader(entry.BaseAction == null? "Unset Action###" : entry.BaseAction.Name + "###"))
+                if (ImGui.CollapsingHeader(entry.BaseAction == null ? "Unset Action###" : entry.BaseAction.Name + "###"))
                 {
                     ImGui.SetNextItemWidth(100);
                     // Require user to select a job, filtering actions down.
@@ -315,7 +332,7 @@ namespace MOAction
                                                 stackEntry.Target = target;
                                             }
                                     }
-                                    
+
                                     ImGui.EndCombo();
                                 }
                                 ImGui.SameLine();
@@ -361,7 +378,7 @@ namespace MOAction
                                 CopyToClipboard(new() { entry });
                             }
                             ImGui.SameLine();
-                            if (ImGui.Button ("Delete Stack"))
+                            if (ImGui.Button("Delete Stack"))
                             {
                                 list.Remove(entry);
                                 SavedStacks[entry.GetJob(dataManager)].Remove(entry);
@@ -373,7 +390,7 @@ namespace MOAction
                 }
                 ImGui.PopID(); //pop i
             }
-            
+
         }
 
         private void CopyToClipboard(List<MoActionStack> list)
@@ -420,10 +437,10 @@ namespace MOAction
                 Configuration.Stacks.Add(new ConfigurationEntry(x.BaseAction.RowId, x.Entries.Select(y => (y.Target.TargetName, y.Action.RowId)).ToList(), x.Modifier, x.Job));
             UpdateConfig();
         }
-        
+
         private void DrawConfig()
         {
-            ImGui.SetNextWindowSize(new Vector2(800, 800) * ImGuiHelpers.GlobalScale, ImGuiCond.Once);
+            ImGui.SetNextWindowSize(new Vector2(800, 800) * ImGui.GetIO().FontGlobalScale, ImGuiCond.Once);
             ImGui.Begin("Action stack setup", ref isImguiMoSetupOpen,
                 ImGuiWindowFlags.NoCollapse);
             ImGui.Text("This window allows you to set up your action stacks.");
@@ -437,7 +454,7 @@ namespace MOAction
                     UseShellExecute = true
                 });
             }
-            
+
             ImGui.Checkbox("Stack entry fails if target is out of range.", ref rangeCheck);
             if (ImGui.Button("Copy all stacks to clipboard"))
             {
@@ -469,7 +486,7 @@ namespace MOAction
                     ImGui.EndPopup();
                 }
             }
-            ImGui.BeginChild("scrolling", new Vector2(0, -(25 + ImGui.GetStyle().ItemSpacing.Y) * ImGuiHelpers.GlobalScale), true);
+            ImGui.BeginChild("scrolling", new Vector2(0, -(25 + ImGui.GetStyle().ItemSpacing.Y) * ImGui.GetIO().FontGlobalScale), true);
 
             // sorted stacks are grouped by job.
             ImGui.PushID("Sorted Stacks");
@@ -479,9 +496,9 @@ namespace MOAction
                 var entries = SavedStacks[jobName];
                 if (entries.Count == 0) continue;
                 var key = jobName;
-                
+
                 ImGui.PushID(key); //push job
-                
+
                 ImGui.SetNextItemWidth(300);
                 if (ImGui.CollapsingHeader(key))
                 {
@@ -491,7 +508,7 @@ namespace MOAction
                     }
                     ImGui.Indent();
                     DrawConfigForList(SortedStacks[jobName]);
-                    
+
                     ImGui.Unindent();
                 }
                 ImGui.PopID(); //pop job
@@ -551,9 +568,9 @@ namespace MOAction
                 tmp.Sort();
                 SortedStacks[k] = tmp;
             }
-            
-        }     
-        
+
+        }
+
         private void UpdateConfig()
         {
             Configuration.Version = CURRENT_CONFIG_VERSION;
@@ -563,7 +580,7 @@ namespace MOAction
 
             pluginInterface.SavePluginConfig(Configuration);
         }
-        
+
 
         public List<MoActionStack> RebuildStacks(List<ConfigurationEntry> configurationEntries)
         {
@@ -609,7 +626,7 @@ namespace MOAction
         private void SortActions()
         {
             List<Lumina.Excel.GeneratedSheets.Action> tmp = new();
-            
+
             foreach (var x in JobAbbreviations)
             {
                 var elem = x.Name;
@@ -626,7 +643,7 @@ namespace MOAction
                 var elem = x.Name;
                 foreach (var action in applicableActions)
                 {
-                    var nameStr = action.ClassJobCategory.Value.Name.ToString();                  
+                    var nameStr = action.ClassJobCategory.Value.Name.ToString();
                     if ((nameStr.Contains(elem) || nameStr.Contains(x.Abbreviation)) && action.IsRoleAction && !tmp.Contains(action))
                         tmp.Add(action);
                 }
