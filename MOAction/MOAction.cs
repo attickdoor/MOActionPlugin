@@ -67,9 +67,9 @@ namespace MOAction
 
         public MOAction(ISigScanner scanner,
                         IClientState clientstate,
-                        IDataManager datamanager, 
-                        ITargetManager targetmanager, 
-                        IObjectTable objects, 
+                        IDataManager datamanager,
+                        ITargetManager targetmanager,
+                        IObjectTable objects,
                         IKeyState keystate,
                         IGameGui gamegui,
                         IGameInteropProvider hookprovider,
@@ -144,7 +144,14 @@ namespace MOAction
 
         private unsafe void HookUseAction()
         {
-            SafeMemory.WriteBytes(Address.GtQueuePatch, new byte[] { 0xEB });
+            //read current bytes at GtQueuePatch for Dispose
+            SafeMemory.ReadBytes(Address.GtQueuePatch, 2, out var prePatch);
+            Address.preGtQueuePatchData = prePatch;
+
+            //Apply 2 NOOP actions there (0x90 is noop right?)
+            SafeMemory.WriteBytes(Address.GtQueuePatch, new byte[] { 0x90, 0x90 });
+
+
             requestActionHook = hookprovider.HookFromAddress((IntPtr)ActionManager.Addresses.UseAction.Value, new OnRequestActionDetour(HandleRequestAction));
             requestActionHook.Enable();
         }
@@ -162,8 +169,10 @@ namespace MOAction
             {
                 requestActionHook.Dispose();
                 uiMoEntityIdHook.Dispose();
-                
-                SafeMemory.WriteBytes(Address.GtQueuePatch, new byte[] { 0x74 });
+
+                //re-write the original 2 bytes that were there
+                //6.5: 0x75 , 0x49 (when printed out i got "uI", and referencing a hex table that'd be 0x75 and 0x49) but this would mean I don't need to know this anymore.
+                SafeMemory.WriteBytes(Address.GtQueuePatch, Address.preGtQueuePatchData);
             }
         }
 
