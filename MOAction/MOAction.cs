@@ -2,22 +2,20 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
-using Dalamud.Data;
 using Dalamud.Game;
-using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Hooking;
 using Dalamud.Logging;
-using Dalamud.Plugin;
 using Dalamud.Game.ClientState.Keys;
 using MOAction.Configuration;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
-using Dalamud.Game.Gui;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using static MOAction.MOActionAddressResolver;
 using Dalamud;
+using Dalamud.Plugin.Services;
+
 
 namespace MOAction
 {
@@ -43,9 +41,6 @@ namespace MOAction
         public List<MoActionStack> Stacks { get; set; }
         private Lumina.Excel.ExcelSheet<Lumina.Excel.GeneratedSheets.Action> RawActions;
 
-        public IntPtr fieldMOLocation;
-        public IntPtr focusTargLocation;
-        public IntPtr regularTargLocation;
         public IntPtr uiMoEntityId = IntPtr.Zero;
 
         private HashSet<uint> UnorthodoxFriendly;
@@ -56,31 +51,38 @@ namespace MOAction
         public bool IsGuiMOEnabled = false;
         public bool IsFieldMOEnabled = false;
 
-        public DataManager dataManager;
-        public TargetManager targetManager;
-        public ClientState clientState;
-        public KeyState keyState;
-        public static ObjectTable objectTable;
-        private GameGui gameGui;
+        private IClientState clientState;
+        private ITargetManager targetManager;
+        private IDataManager dataManager;
+        private ICommandManager commandManager;
+        public static IObjectTable objectTable;
+        private IGameGui gameGui;
+        private IKeyState keyState;
+        private IGameInteropProvider hookprovider;
+        private IPluginLog pluginLog;
 
         private unsafe PronounModule* PM;
         private unsafe ActionManager* AM;
         private readonly int IdOffset = (int)Marshal.OffsetOf<FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject>("ObjectID");
 
-        public MOAction(SigScanner scanner, ClientState clientstate,
-                        DataManager datamanager, TargetManager targetmanager, ObjectTable objects, KeyState keystate, GameGui gamegui
+        public MOAction(ISigScanner scanner,
+                        IClientState clientstate,
+                        IDataManager datamanager,
+                        ITargetManager targetmanager,
+                        IObjectTable objects,
+                        IKeyState keystate,
+                        IGameGui gamegui,
+                        IGameInteropProvider hookprovider,
+                        IPluginLog pluginLog
                         )
         {
-            Address = new();
-            Address.Setup(scanner);
+            Address = new(scanner);
             clientstate.Login += LoadClientModules;
             clientstate.Logout += ClearClientModules;
-            if (clientstate.IsLoggedIn)
-                LoadClientModules(null, null);
+            if (clientstate.IsLoggedIn){
+                LoadClientModules();
+            }
 
-            fieldMOLocation = Address.FieldMO;
-            focusTargLocation = Address.FocusTarg;
-            regularTargLocation = Address.RegularTarg;
             
             dataManager = datamanager;
 
@@ -91,20 +93,25 @@ namespace MOAction
             objectTable = objects;
             keyState = keystate;
             gameGui = gamegui;
+            this.hookprovider = hookprovider;
+            this.pluginLog = pluginLog;
 
             Stacks = new();
 
-            PluginLog.Log("===== M O A C T I O N =====");
-            PluginLog.Log("SetUiMouseoverEntityId address {SetUiMouseoverEntityId}", Address.SetUiMouseoverEntityId);
+            pluginLog.Info("===== M O A C T I O N =====");
+            pluginLog.Debug("SetUiMouseoverEntityId address {SetUiMouseoverEntityId}", Address.SetUiMouseoverEntityId);
             
-            uiMoEntityIdHook = Hook<OnSetUiMouseoverEntityId>.FromAddress(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId));
+            uiMoEntityIdHook = hookprovider.HookFromAddress(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId));
 
             enabledActions = new();
-            UnorthodoxFriendly = new();
-            UnorthodoxHostile = new();
-            UnorthodoxHostile.Add(3575);
-            UnorthodoxFriendly.Add(17055);
-            UnorthodoxFriendly.Add(7443);
+            UnorthodoxFriendly = new(){
+                17055,
+                7443
+            };
+            UnorthodoxHostile = new()
+            {
+                3575
+            };
         }
 
         public void SetConfig(MOActionConfiguration config)
@@ -112,7 +119,7 @@ namespace MOAction
             Configuration = config;
         }
 
-        private unsafe void LoadClientModules(object sender, EventArgs args)
+        private unsafe void LoadClientModules()
         {
             try
             {
@@ -123,13 +130,13 @@ namespace MOAction
                 getGroupTimer = Marshal.GetDelegateForFunctionPointer<GetGroupTimerDelegate>((IntPtr)ActionManager.Addresses.GetRecastGroupDetail.Value);
             }
             catch (Exception e) {
-                PluginLog.Log(e.Message);
-                PluginLog.Log(e.StackTrace);
-                PluginLog.Log(e.InnerException.ToString());
+                pluginLog.Warning(e.Message);
+                pluginLog.Warning(e.StackTrace);
+                pluginLog.Warning(e.InnerException.ToString());
             }
         }
 
-        private unsafe void ClearClientModules(object sender, EventArgs args)
+        private unsafe void ClearClientModules()
         {
             PM = null;
             AM = null;
@@ -137,8 +144,15 @@ namespace MOAction
 
         private unsafe void HookUseAction()
         {
-            SafeMemory.WriteBytes(Address.GtQueuePatch, new byte[] { 0xEB });
-            requestActionHook = Hook<OnRequestActionDetour>.FromAddress((IntPtr)ActionManager.Addresses.UseAction.Value, new OnRequestActionDetour(HandleRequestAction));
+            //read current bytes at GtQueuePatch for Dispose
+            SafeMemory.ReadBytes(Address.GtQueuePatch, 2, out var prePatch);
+            Address.preGtQueuePatchData = prePatch;
+
+            //Apply 2 NOOP actions there (0x90 is noop right?)
+            SafeMemory.WriteBytes(Address.GtQueuePatch, new byte[] { 0x90, 0x90 });
+
+
+            requestActionHook = hookprovider.HookFromAddress((IntPtr)ActionManager.Addresses.UseAction.Value, new OnRequestActionDetour(HandleRequestAction));
             requestActionHook.Enable();
         }
 
@@ -155,8 +169,10 @@ namespace MOAction
             {
                 requestActionHook.Dispose();
                 uiMoEntityIdHook.Dispose();
-                
-                SafeMemory.WriteBytes(Address.GtQueuePatch, new byte[] { 0x74 });
+
+                //re-write the original 2 bytes that were there
+                //6.5: 0x75 , 0x49 (when printed out i got "uI", and referencing a hex table that'd be 0x75 and 0x49) but this would mean I don't need to know this anymore.
+                SafeMemory.WriteBytes(Address.GtQueuePatch, Address.preGtQueuePatchData);
             }
         }
 
@@ -313,14 +329,13 @@ namespace MOAction
         {
             return objectTable.CreateObjectReference(uiMoEntityId);
         }
-        public uint GetFieldMoPtr() => (uint)Marshal.ReadInt32(fieldMOLocation);
         public GameObject GetFocusPtr()
         {
-            return objectTable.CreateObjectReference(Marshal.ReadIntPtr(focusTargLocation));
+            return targetManager.FocusTarget;
         }
         public GameObject GetRegTargPtr()
         {
-            return objectTable.CreateObjectReference(regularTargLocation - IdOffset);
+            return targetManager.Target;
         }
         public GameObject NewFieldMo() => targetManager.MouseOverTarget;
 
