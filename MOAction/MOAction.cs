@@ -7,7 +7,6 @@ using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Hooking;
-using Dalamud.Logging;
 using Dalamud.Game.ClientState.Keys;
 using MOAction.Configuration;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
@@ -15,6 +14,7 @@ using FFXIVClientStructs.FFXIV.Client.Game;
 using static MOAction.MOActionAddressResolver;
 using Dalamud;
 using Dalamud.Plugin.Services;
+using Lumina.Excel;
 
 
 namespace MOAction
@@ -42,9 +42,6 @@ namespace MOAction
         private Lumina.Excel.ExcelSheet<Lumina.Excel.GeneratedSheets.Action> RawActions;
 
         public IntPtr uiMoEntityId = IntPtr.Zero;
-
-        private HashSet<uint> UnorthodoxFriendly;
-        private HashSet<uint> UnorthodoxHostile;
 
         public HashSet<ulong> enabledActions;
 
@@ -104,14 +101,6 @@ namespace MOAction
             uiMoEntityIdHook = hookprovider.HookFromAddress(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId));
 
             enabledActions = new();
-            UnorthodoxFriendly = new(){
-                17055,
-                7443
-            };
-            UnorthodoxHostile = new()
-            {
-                3575
-            };
         }
 
         public void SetConfig(MOActionConfiguration config)
@@ -294,35 +283,23 @@ namespace MOAction
                     if (AvailableCharges(action) == 0) return false;
                 }
             }
+
+            var target_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)target.Address;
             if (Configuration.RangeCheck)
             { 
                 var player = clientState.LocalPlayer;
                 var player_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)player.Address;
-                var target_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)target.Address;
-                
+
                 uint err = ActionManager.GetActionInRangeOrLoS(action.RowId, player_ptr, target_ptr);
                 if (action.TargetArea) return true;
                 else if (err != 0 && err != 565) return false;
             }
-            if (target.ObjectKind == ObjectKind.Player) return action.CanTargetFriendly ||
-                    action.CanTargetParty ||
-                    action.CanTargetSelf ||
-                    action.TargetArea ||
-                    UnorthodoxFriendly.Contains((uint)action.RowId);
-            if (target.ObjectKind == ObjectKind.BattleNpc)
-            {
-                BattleNpc b = (BattleNpc)target;
-                if (!(b.BattleNpcKind == BattleNpcSubKind.Enemy || b.BattleNpcKind == BattleNpcSubKind.BattleNpcPart)){
-                    return action.CanTargetFriendly ||
-                        action.CanTargetParty ||
-                        action.CanTargetSelf ||
-                        action.TargetArea ||
-                        UnorthodoxFriendly.Contains((uint)action.RowId);
-                }
-            }
-            return action.CanTargetHostile ||
-                action.TargetArea ||
-                UnorthodoxHostile.Contains((uint)action.RowId);
+
+            pluginLog.Verbose("is {actionname} a area spell/ability? {answer}", action.Name, action.TargetArea);
+            if(action.TargetArea) return true;
+
+            pluginLog.Verbose("can I use action: {rowid} with name {actionname} on target {targetid} with name {targetname}", action.RowId.ToString(), action.Name, target.DataId, target.Name);
+            return ActionManager.CanUseActionOnTarget(action.RowId,target_ptr);
         }
 
         public GameObject GetGuiMoPtr()
