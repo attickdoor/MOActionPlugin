@@ -21,6 +21,7 @@ namespace MOAction
 {
     public class MOAction
     {
+        private readonly Dictionary<uint,Lumina.Excel.GeneratedSheets.ClassJob> JobDictionary;
         public delegate bool OnRequestActionDetour(long param_1, byte param_2, ulong param_3, long param_4,
                        uint param_5, uint param_6, uint param_7, long param_8);
 
@@ -73,7 +74,8 @@ namespace MOAction
                         IKeyState keystate,
                         IGameGui gamegui,
                         IGameInteropProvider hookprovider,
-                        IPluginLog pluginLog
+                        IPluginLog pluginLog,
+                        Dictionary<uint,Lumina.Excel.GeneratedSheets.ClassJob> JobDictionary
                         )
         {
             Address = new(scanner);
@@ -95,6 +97,7 @@ namespace MOAction
             gameGui = gamegui;
             this.hookprovider = hookprovider;
             this.pluginLog = pluginLog;
+            this.JobDictionary = JobDictionary;
 
             Stacks = new();
 
@@ -228,7 +231,12 @@ namespace MOAction
             var applicableActions = Stacks.Where(entry => (entry.BaseAction.RowId == action.RowId || 
                                                           entry.BaseAction.RowId == adjusted || 
                                                           AM->GetAdjustedActionId(entry.BaseAction.RowId) == adjusted)
-                                                          && clientState.LocalPlayer.ClassJob.Id == UInt32.Parse(entry.Job));
+                                                          && (clientState.LocalPlayer.ClassJob.Id == UInt32.Parse(entry.Job) 
+                                                          //FUCK this wasn't easy to get WHM stacks to work on CNJ, ....
+                                                          //This works by grabbing parentJob. ParentJob is either a self-reference OR a reference to the non-upgraded class.
+                                                          //row ids and job ids are equal, so your classjob.id of 6 = CNJ -> Jobdictionary[24].ClassjobParent (this be CNJ with row 6)
+                                                          || clientState.LocalPlayer.ClassJob.Id == JobDictionary[UInt32.Parse(entry.Job)].ClassJobParent.Row
+                                                          ));
             
             MoActionStack stackToUse = null;
             foreach (var entry in applicableActions)
