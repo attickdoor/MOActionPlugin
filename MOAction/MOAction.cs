@@ -224,7 +224,11 @@ namespace MOAction
             uint adjusted = AM->GetAdjustedActionId(ActionID);
 
             if (action == null) return (null, null);
-            var applicableActions = Stacks.Where(entry => entry.BaseAction.RowId == action.RowId || entry.BaseAction.RowId == adjusted || AM->GetAdjustedActionId(entry.BaseAction.RowId) == adjusted);
+
+            var applicableActions = Stacks.Where(entry => (entry.BaseAction.RowId == action.RowId || 
+                                                          entry.BaseAction.RowId == adjusted || 
+                                                          AM->GetAdjustedActionId(entry.BaseAction.RowId) == adjusted)
+                                                          && clientState.LocalPlayer.ClassJob.Id == UInt32.Parse(entry.Job));
             
             MoActionStack stackToUse = null;
             foreach (var entry in applicableActions)
