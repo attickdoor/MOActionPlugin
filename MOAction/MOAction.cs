@@ -4,10 +4,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Dalamud.Game;
 using Dalamud.Game.ClientState.Objects;
-using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Hooking;
-using Dalamud.Logging;
 using Dalamud.Game.ClientState.Keys;
 using MOAction.Configuration;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
@@ -16,11 +14,11 @@ using static MOAction.MOActionAddressResolver;
 using Dalamud;
 using Dalamud.Plugin.Services;
 
-
 namespace MOAction
 {
     public class MOAction
     {
+        private readonly Dictionary<uint,Lumina.Excel.GeneratedSheets.ClassJob> JobDictionary;
         public delegate bool OnRequestActionDetour(long param_1, byte param_2, ulong param_3, long param_4,
                        uint param_5, uint param_6, uint param_7, long param_8);
 
@@ -42,9 +40,6 @@ namespace MOAction
         private Lumina.Excel.ExcelSheet<Lumina.Excel.GeneratedSheets.Action> RawActions;
 
         public IntPtr uiMoEntityId = IntPtr.Zero;
-
-        private HashSet<uint> UnorthodoxFriendly;
-        private HashSet<uint> UnorthodoxHostile;
 
         public HashSet<ulong> enabledActions;
 
@@ -73,7 +68,8 @@ namespace MOAction
                         IKeyState keystate,
                         IGameGui gamegui,
                         IGameInteropProvider hookprovider,
-                        IPluginLog pluginLog
+                        IPluginLog pluginLog,
+                        Dictionary<uint,Lumina.Excel.GeneratedSheets.ClassJob> JobDictionary
                         )
         {
             Address = new(scanner);
@@ -95,6 +91,7 @@ namespace MOAction
             gameGui = gamegui;
             this.hookprovider = hookprovider;
             this.pluginLog = pluginLog;
+            this.JobDictionary = JobDictionary;
 
             Stacks = new();
 
@@ -104,14 +101,6 @@ namespace MOAction
             uiMoEntityIdHook = hookprovider.HookFromAddress(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId));
 
             enabledActions = new();
-            UnorthodoxFriendly = new(){
-                17055,
-                7443
-            };
-            UnorthodoxHostile = new()
-            {
-                3575
-            };
         }
 
         public void SetConfig(MOActionConfiguration config)
@@ -224,7 +213,16 @@ namespace MOAction
             uint adjusted = AM->GetAdjustedActionId(ActionID);
 
             if (action == null) return (null, null);
-            var applicableActions = Stacks.Where(entry => entry.BaseAction.RowId == action.RowId || entry.BaseAction.RowId == adjusted || AM->GetAdjustedActionId(entry.BaseAction.RowId) == adjusted);
+
+            var applicableActions = Stacks.Where(entry => (entry.BaseAction.RowId == action.RowId || 
+                                                          entry.BaseAction.RowId == adjusted || 
+                                                          AM->GetAdjustedActionId(entry.BaseAction.RowId) == adjusted)
+                                                          && (clientState.LocalPlayer.ClassJob.Id == UInt32.Parse(entry.Job) 
+                                                          //FUCK this wasn't easy to get WHM stacks to work on CNJ, ....
+                                                          //This works by grabbing parentJob. ParentJob is either a self-reference OR a reference to the non-upgraded class.
+                                                          //row ids and job ids are equal, so your classjob.id of 6 = CNJ -> Jobdictionary[24].ClassjobParent (this be CNJ with row 6)
+                                                          || clientState.LocalPlayer.ClassJob.Id == JobDictionary[UInt32.Parse(entry.Job)].ClassJobParent.Row
+                                                          ));
             
             MoActionStack stackToUse = null;
             foreach (var entry in applicableActions)
@@ -294,35 +292,33 @@ namespace MOAction
                     if (AvailableCharges(action) == 0) return false;
                 }
             }
+
+            var player = clientState.LocalPlayer;
+            var target_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)target.Address;
             if (Configuration.RangeCheck)
             { 
-                var player = clientState.LocalPlayer;
-                var player_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)player.Address;
-                var target_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)target.Address;
                 
+                var player_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)player.Address;
+
                 uint err = ActionManager.GetActionInRangeOrLoS(action.RowId, player_ptr, target_ptr);
                 if (action.TargetArea) return true;
                 else if (err != 0 && err != 565) return false;
             }
-            if (target.ObjectKind == ObjectKind.Player) return action.CanTargetFriendly ||
-                    action.CanTargetParty ||
-                    action.CanTargetSelf ||
-                    action.TargetArea ||
-                    UnorthodoxFriendly.Contains((uint)action.RowId);
-            if (target.ObjectKind == ObjectKind.BattleNpc)
-            {
-                BattleNpc b = (BattleNpc)target;
-                if (!(b.BattleNpcKind == BattleNpcSubKind.Enemy || b.BattleNpcKind == BattleNpcSubKind.BattleNpcPart)){
-                    return action.CanTargetFriendly ||
-                        action.CanTargetParty ||
-                        action.CanTargetSelf ||
-                        action.TargetArea ||
-                        UnorthodoxFriendly.Contains((uint)action.RowId);
-                }
+
+            //Skip actions you cannot use when synced down, excluding role actions that can be used even when syncing down.
+            pluginLog.Verbose("is {actionname} a role action?: {answer}",action.Name, action.IsRoleAction);
+            if(!action.IsRoleAction){
+                pluginLog.Verbose("is {actionName} usable at level: {level} available for player {playername} with {playerlevel}?",action.Name, action.ClassJobLevel,player.Name,player.Level);
+                if(action.ClassJobLevel > clientState.LocalPlayer.Level) return false;
             }
-            return action.CanTargetHostile ||
-                action.TargetArea ||
-                UnorthodoxHostile.Contains((uint)action.RowId);
+            
+            //area of effect spells do not require a target to work.
+            pluginLog.Verbose("is {actionname} a area spell/ability? {answer}", action.Name, action.TargetArea);
+            if(action.TargetArea) return true;
+
+            //handoff to game native code, returns true if the actionManager declares that the action can be used on the target specified
+            pluginLog.Verbose("can I use action: {rowid} with name {actionname} on target {targetid} with name {targetname}", action.RowId.ToString(), action.Name, target.DataId, target.Name);
+            return ActionManager.CanUseActionOnTarget(action.RowId,target_ptr);
         }
 
         public GameObject GetGuiMoPtr()
