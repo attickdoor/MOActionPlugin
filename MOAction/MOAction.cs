@@ -13,12 +13,13 @@ using FFXIVClientStructs.FFXIV.Client.Game;
 using static MOAction.MOActionAddressResolver;
 using Dalamud;
 using Dalamud.Plugin.Services;
+using Lumina.Excel.GeneratedSheets;
 
 namespace MOAction
 {
     public class MOAction
     {
-        private readonly Dictionary<uint,Lumina.Excel.GeneratedSheets.ClassJob> JobDictionary;
+        private readonly Dictionary<uint, Lumina.Excel.GeneratedSheets.ClassJob> JobDictionary;
         public delegate bool OnRequestActionDetour(long param_1, byte param_2, ulong param_3, long param_4,
                        uint param_5, uint param_6, uint param_7, long param_8);
 
@@ -69,17 +70,18 @@ namespace MOAction
                         IGameGui gamegui,
                         IGameInteropProvider hookprovider,
                         IPluginLog pluginLog,
-                        Dictionary<uint,Lumina.Excel.GeneratedSheets.ClassJob> JobDictionary
+                        Dictionary<uint, Lumina.Excel.GeneratedSheets.ClassJob> JobDictionary
                         )
         {
             Address = new(scanner);
             clientstate.Login += LoadClientModules;
             clientstate.Logout += ClearClientModules;
-            if (clientstate.IsLoggedIn){
+            if (clientstate.IsLoggedIn)
+            {
                 LoadClientModules();
             }
 
-            
+
             dataManager = datamanager;
 
             RawActions = dataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>();
@@ -97,7 +99,7 @@ namespace MOAction
 
             pluginLog.Info("===== M O A C T I O N =====");
             pluginLog.Debug("SetUiMouseoverEntityId address {SetUiMouseoverEntityId}", Address.SetUiMouseoverEntityId);
-            
+
             uiMoEntityIdHook = hookprovider.HookFromAddress(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId));
 
             enabledActions = new();
@@ -118,7 +120,8 @@ namespace MOAction
                 AM = ActionManager.Instance();
                 getGroupTimer = Marshal.GetDelegateForFunctionPointer<GetGroupTimerDelegate>((IntPtr)ActionManager.Addresses.GetRecastGroupDetail.Value);
             }
-            catch (Exception e) {
+            catch (Exception e)
+            {
                 pluginLog.Warning(e.Message);
                 pluginLog.Warning(e.StackTrace);
                 pluginLog.Warning(e.InnerException.ToString());
@@ -176,24 +179,25 @@ namespace MOAction
             uiMoEntityIdHook.Original(param1, param2);
         }
 
-        private unsafe bool HandleRequestAction(long param_1, byte actionType, ulong actionID, long param_4,
+        private unsafe bool HandleRequestAction(long param_1, byte actionType, ulong actionID, long target_ptr,
                        uint param_5, uint param_6, uint param_7, long param_8)
         {
-            // Only care about "real" actions. Not doing anything dodgy, except for GT.
+            // Only care about "real" actions. Not doing anything dodgy
             if (actionType != 1)
             {
-                return requestActionHook.Original(param_1, actionType, actionID, param_4, param_5, param_6, param_7, param_8);
+                return requestActionHook.Original(param_1, actionType, actionID, target_ptr, param_5, param_6, param_7, param_8);
             }
-            var (action, target) = GetActionTarget((uint)actionID, actionType);
-            
-            if (action == null) return requestActionHook.Original(param_1, actionType, actionID, param_4, param_5, param_6, param_7, param_8);
+            pluginLog.Verbose("Receiving handling request for Action: {id}", actionID);
 
-            // Earthly Star is the only GT that changes to a different action.
-            if (action.RowId == 7439 && clientState.LocalPlayer.StatusList.Any(x => x.StatusId == 1248 || x.StatusId == 1224))
-                return requestActionHook.Original(param_1, actionType, actionID, param_4, param_5, param_6, param_7, param_8);
-            
+            var (action, target) = GetActionTarget((uint)actionID, actionType);
+
+            if (action == null)
+            {
+                return requestActionHook.Original(param_1, actionType, actionID, target_ptr, param_5, param_6, param_7, param_8);
+            }
 
             long objectId = target == null ? 0xE0000000 : target.ObjectId;
+            pluginLog.Verbose("Execution Action {action} with ActionID {actionid} on object with ObjectId {objectid}", action.Name, action.RowId, objectId);
 
             bool ret = requestActionHook.Original(param_1, actionType, action.RowId, objectId, param_5, param_6, param_7, param_8);
 
@@ -209,21 +213,21 @@ namespace MOAction
         private unsafe (Lumina.Excel.GeneratedSheets.Action action, GameObject target) GetActionTarget(uint ActionID, uint ActionType)
         {
             var action = RawActions.GetRow(ActionID);
-            
+
             uint adjusted = AM->GetAdjustedActionId(ActionID);
 
             if (action == null) return (null, null);
 
-            var applicableActions = Stacks.Where(entry => (entry.BaseAction.RowId == action.RowId || 
-                                                          entry.BaseAction.RowId == adjusted || 
+            var applicableActions = Stacks.Where(entry => (entry.BaseAction.RowId == action.RowId ||
+                                                          entry.BaseAction.RowId == adjusted ||
                                                           AM->GetAdjustedActionId(entry.BaseAction.RowId) == adjusted)
-                                                          && (clientState.LocalPlayer.ClassJob.Id == UInt32.Parse(entry.Job) 
+                                                          && (clientState.LocalPlayer.ClassJob.Id == UInt32.Parse(entry.Job)
                                                           //FUCK this wasn't easy to get WHM stacks to work on CNJ, ....
                                                           //This works by grabbing parentJob. ParentJob is either a self-reference OR a reference to the non-upgraded class.
                                                           //row ids and job ids are equal, so your classjob.id of 6 = CNJ -> Jobdictionary[24].ClassjobParent (this be CNJ with row 6)
                                                           || clientState.LocalPlayer.ClassJob.Id == JobDictionary[UInt32.Parse(entry.Job)].ClassJobParent.Row
                                                           ));
-            
+
             MoActionStack stackToUse = null;
             foreach (var entry in applicableActions)
             {
@@ -237,88 +241,88 @@ namespace MOAction
                     break;
                 }
             }
-            
+
             if (stackToUse == null)
             {
+                pluginLog.Verbose("No action stack applicable for action: {action}", action.Name);
                 return (null, null);
             }
             foreach (StackEntry entry in stackToUse.Entries)
             {
-                if (CanUseAction(entry, ActionType))
+                pluginLog.Verbose("unadjusted entry action, {rowid}, {name}", entry.Action.RowId, entry.Action.Name);
+                var (response, target) = CanUseAction(entry, ActionType);
+                if (response)
                 {
-                    if (!entry.Action.CanTargetFriendly && !entry.Action.CanTargetHostile && !entry.Action.CanTargetParty && !entry.Action.CanTargetDead) return (entry.Action, clientState.LocalPlayer);
-                    return (entry.Action, entry.Target.getPtr());
+                    return (entry.Action, target);
                 }
+
             }
+            pluginLog.Verbose("Chosen MoAction Entry stack did not have any usable actions.");
             return (null, null);
         }
 
-        private unsafe int AvailableCharges(Lumina.Excel.GeneratedSheets.Action action)
+        private unsafe (bool, GameObject Target) CanUseAction(StackEntry targ, uint actionType)
         {
-            RecastTimer* timer;
-            if (action.CooldownGroup == 58)
-                timer = GetGroupRecastTimer(action.AdditionalCooldownGroup);
-            else
-                timer = GetGroupRecastTimer(action.CooldownGroup);
-            if (action.MaxCharges == 0) return timer->IsActive ^ 1;
-            return (int)((action.MaxCharges+1) * (timer->Elapsed / timer->Total));
-        }
+            if (targ.Target == null || targ.Action == null) return (false, null);
 
-        private unsafe bool CanUseAction(StackEntry targ, uint actionType)
-        {
-            if (targ.Target == null || targ.Action == null) return false;
-            
-            var action = targ.Action;
-            action = RawActions.GetRow(AM->GetAdjustedActionId(targ.Action.RowId));
-            if (action == null) return false; // just in case
+            var unadjustedAction = targ.Action;
+            var action = RawActions.GetRow(AM->GetAdjustedActionId(targ.Action.RowId));
+            if (action == null) return (false, null); // just in case
+
             var target = targ.Target.GetTarget();
             if (target == null)
             {
-                return !targ.Target.ObjectNeeded;
+                return (!targ.Target.ObjectNeeded, clientState.LocalPlayer);
             }
-         
+
             // Check if ability is on CD or not (charges are fun!)
-            unsafe
+            bool abilityOnCoolDownResponse = AM->IsActionOffCooldown((ActionType)actionType, action.RowId);
+            pluginLog.Verbose("Is {ability} off cooldown? : {response}", action.Name, abilityOnCoolDownResponse);
+            if (!abilityOnCoolDownResponse)
             {
-                if (action.ActionCategory.Value.RowId == (uint)ActionType.Ability && action.MaxCharges == 0)
-                {
-                    if (AM->IsRecastTimerActive((ActionType)actionType, action.RowId))
-                    {
-                        return false;
-                    }
-                }
-                else if (action.MaxCharges > 0 || (action.CooldownGroup != 0 && action.AdditionalCooldownGroup != 0))
-                {
-                    if (AvailableCharges(action) == 0) return false;
-                }
+                return (false, target);
             }
 
             var player = clientState.LocalPlayer;
             var target_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)target.Address;
             if (Configuration.RangeCheck)
-            { 
-                
+            {
+
                 var player_ptr = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)player.Address;
 
                 uint err = ActionManager.GetActionInRangeOrLoS(action.RowId, player_ptr, target_ptr);
-                if (action.TargetArea) return true;
-                else if (err != 0 && err != 565) return false;
+                if (action.TargetArea) return (true, target);
+                else if (err != 0 && err != 565) return (false, target);
             }
 
             //Skip actions you cannot use when synced down, excluding role actions that can be used even when syncing down.
-            pluginLog.Verbose("is {actionname} a role action?: {answer}",action.Name, action.IsRoleAction);
-            if(!action.IsRoleAction){
-                pluginLog.Verbose("is {actionName} usable at level: {level} available for player {playername} with {playerlevel}?",action.Name, action.ClassJobLevel,player.Name,player.Level);
-                if(action.ClassJobLevel > clientState.LocalPlayer.Level) return false;
+            pluginLog.Verbose("is {actionname} a role action?: {answer}", action.Name, action.IsRoleAction);
+            if (!action.IsRoleAction)
+            {
+                pluginLog.Verbose("is {actionName} usable at level: {level} available for player {playername} with {playerlevel}?", action.Name, action.ClassJobLevel, player.Name, player.Level);
+                if (action.ClassJobLevel > clientState.LocalPlayer.Level) return (false, target);
             }
-            
+
             //area of effect spells do not require a target to work.
             pluginLog.Verbose("is {actionname} a area spell/ability? {answer}", action.Name, action.TargetArea);
-            if(action.TargetArea) return true;
+            if (action.TargetArea) return (true, target);
+
+
+
+            //sanity check on spells that can not be used on friendly, hostile or party
+            bool selfOnlyTargetAction = !action.CanTargetFriendly && !action.CanTargetHostile && !action.CanTargetParty;
+            pluginLog.Verbose("Can {actionname} target: friendly - {friendly}, hostile  - {hostile}, party  - {party}, dead - {dead}, self - {self}", action.Name, action.CanTargetFriendly, action.CanTargetHostile, action.CanTargetParty, action.CanTargetDead, action.CanTargetSelf);
+            if (selfOnlyTargetAction)
+            {
+                pluginLog.Verbose("Can only use this action on player, setting player as target");
+                target = clientState.LocalPlayer;
+            }
 
             //handoff to game native code, returns true if the actionManager declares that the action can be used on the target specified
-            pluginLog.Verbose("can I use action: {rowid} with name {actionname} on target {targetid} with name {targetname}", action.RowId.ToString(), action.Name, target.DataId, target.Name);
-            return ActionManager.CanUseActionOnTarget(action.RowId,target_ptr);
+            bool gameCanUseActionResponse = ActionManager.CanUseActionOnTarget(action.RowId, (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)target.Address);
+            pluginLog.Verbose("can I use action: {rowid} with name {actionname} on target {targetid} with name {targetname} : {response}", action.RowId.ToString(), action.Name, target.DataId, target.Name, gameCanUseActionResponse);
+
+            return (gameCanUseActionResponse, target);
         }
 
         public GameObject GetGuiMoPtr()
