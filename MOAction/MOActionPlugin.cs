@@ -129,7 +129,8 @@ namespace MOAction
                                     keystate, 
                                     gamegui,
                                     hookprovider, 
-                                    pluginLog);
+                                    pluginLog,
+                                    Jobs.ToDictionary(item => item.RowId));
 
             foreach (var jobname in JobAbbreviations)
             {
