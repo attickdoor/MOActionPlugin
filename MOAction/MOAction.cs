@@ -13,7 +13,6 @@ using FFXIVClientStructs.FFXIV.Client.Game;
 using static MOAction.MOActionAddressResolver;
 using Dalamud;
 using Dalamud.Plugin.Services;
-using Lumina.Excel.GeneratedSheets;
 
 namespace MOAction
 {
@@ -54,8 +53,8 @@ namespace MOAction
         private IGameInteropProvider hookprovider;
         private IPluginLog pluginLog;
 
-        private unsafe PronounModule* PM;
-        private unsafe ActionManager* AM;
+        private unsafe PronounModule* pronounModule;
+        private unsafe ActionManager* actionManager;
         private readonly int IdOffset = (int)Marshal.OffsetOf<FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject>("ObjectID");
 
         public MOAction(ISigScanner scanner,
@@ -108,10 +107,8 @@ namespace MOAction
         {
             try
             {
-                var framework = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance();
-                var uiModule = framework->GetUiModule();
-                PM = uiModule->GetPronounModule();
-                AM = ActionManager.Instance();
+                pronounModule = PronounModule.Instance();
+                actionManager = ActionManager.Instance();
                 getGroupTimer = Marshal.GetDelegateForFunctionPointer<GetGroupTimerDelegate>((IntPtr)ActionManager.Addresses.GetRecastGroupDetail.Value);
             }
             catch (Exception e)
@@ -124,13 +121,13 @@ namespace MOAction
 
         private unsafe void ClearClientModules()
         {
-            PM = null;
-            AM = null;
+            pronounModule = null;
+            actionManager = null;
         }
 
         public void Enable()
         {
-                        //read current bytes at GtQueuePatch for Dispose
+            //read current bytes at GtQueuePatch for Dispose
             SafeMemory.ReadBytes(Address.GtQueuePatch, 2, out var prePatch);
             Address.preGtQueuePatchData = prePatch;
 
@@ -155,7 +152,7 @@ namespace MOAction
 
         public unsafe RecastTimer* GetGroupRecastTimer(int group)
         {
-            return group < 1 ? null : getGroupTimer(AM, group - 1);
+            return group < 1 ? null : getGroupTimer(actionManager, group - 1);
         }
 
 
@@ -184,8 +181,8 @@ namespace MOAction
             // Enqueue GT action
             if (action.TargetArea)
             {
-                *(long*)((IntPtr)AM + 0x98) = objectId;
-                *(byte*)((IntPtr)AM + 0xB8) = 1;
+                *(long*)((IntPtr)actionManager + 0x98) = objectId;
+                *(byte*)((IntPtr)actionManager + 0xB8) = 1;
             }
             return ret;
         }
@@ -194,13 +191,13 @@ namespace MOAction
         {
             var action = RawActions.GetRow(ActionID);
 
-            uint adjusted = AM->GetAdjustedActionId(ActionID);
+            uint adjusted = actionManager->GetAdjustedActionId(ActionID);
 
             if (action == null) return (null, null);
 
             var applicableActions = Stacks.Where(entry => (entry.BaseAction.RowId == action.RowId ||
                                                           entry.BaseAction.RowId == adjusted ||
-                                                          AM->GetAdjustedActionId(entry.BaseAction.RowId) == adjusted)
+                                                          actionManager->GetAdjustedActionId(entry.BaseAction.RowId) == adjusted)
                                                           && (clientState.LocalPlayer.ClassJob.Id == UInt32.Parse(entry.Job)
                                                           //FUCK this wasn't easy to get WHM stacks to work on CNJ, ....
                                                           //This works by grabbing parentJob. ParentJob is either a self-reference OR a reference to the non-upgraded class.
@@ -246,7 +243,7 @@ namespace MOAction
             if (targ.Target == null || targ.Action == null) return (false, null);
 
             var unadjustedAction = targ.Action;
-            var action = RawActions.GetRow(AM->GetAdjustedActionId(targ.Action.RowId));
+            var action = RawActions.GetRow(actionManager->GetAdjustedActionId(targ.Action.RowId));
             if (action == null) return (false, null); // just in case
 
             var target = targ.Target.GetTarget();
@@ -256,7 +253,7 @@ namespace MOAction
             }
 
             // Check if ability is on CD or not (charges are fun!)
-            bool abilityOnCoolDownResponse = AM->IsActionOffCooldown((ActionType)actionType, action.RowId);
+            bool abilityOnCoolDownResponse = actionManager->IsActionOffCooldown((ActionType)actionType, action.RowId);
             pluginLog.Verbose("Is {ability} off cooldown? : {response}", action.Name, abilityOnCoolDownResponse);
             if (!abilityOnCoolDownResponse)
             {
@@ -305,10 +302,9 @@ namespace MOAction
             return (gameCanUseActionResponse, target);
         }
 
-        public GameObject GetGuiMoPtr()
+        public unsafe GameObject GetGuiMoPtr()
         {
-            //return objectTable.CreateObjectReference(uiMoEntityId);
-            return targetManager.MouseOverNameplateTarget;
+            return objectTable.CreateObjectReference((IntPtr)pronounModule -> UiMouseOverTarget);
         }
         public GameObject GetFocusPtr()
         {
@@ -325,7 +321,7 @@ namespace MOAction
 
         public unsafe GameObject GetActorFromPlaceholder(string placeholder)
         {
-            return objectTable.CreateObjectReference((IntPtr)PM->ResolvePlaceholder(placeholder, 1, 0));
+            return objectTable.CreateObjectReference((IntPtr)pronounModule->ResolvePlaceholder(placeholder, 1, 0));
         }
     }
 }
