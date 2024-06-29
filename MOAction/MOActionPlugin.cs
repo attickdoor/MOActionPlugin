@@ -141,7 +141,7 @@ namespace MOAction
             TargetTypes = new List<TargetType>
             {
                 new EntityTarget(moAction.GetGuiMoPtr, "UI Mouseover"),
-                new EntityTarget(moAction.NewFieldMo, "Field Mouseover"),
+                new EntityTarget(moAction.getFieldMo, "Field Mouseover"),
                 new EntityTarget(() => moAction.GetActorFromPlaceholder("<t>"), "Target"),
                 new EntityTarget(() => moAction.GetActorFromPlaceholder("<f>"), "Focus Target"),
                 new EntityTarget(() => moAction.GetActorFromPlaceholder("<tt>"), "Target of Target"),

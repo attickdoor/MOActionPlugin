@@ -26,13 +26,10 @@ namespace MOAction
         [UnmanagedFunctionPointer(CallingConvention.ThisCall, CharSet = CharSet.Ansi)]
         private delegate ulong ResolvePlaceholderActor(long param1, string param2, byte param3, byte param4);
 
-        public delegate void OnSetUiMouseoverEntityId(long param1, long param2);
-
         private readonly MOActionAddressResolver Address;
         private MOActionConfiguration Configuration;
 
         private Hook<OnRequestActionDetour> requestActionHook;
-        private Hook<OnSetUiMouseoverEntityId> uiMoEntityIdHook;
 
         public unsafe delegate RecastTimer* GetGroupTimerDelegate(void* @this, int cooldownGroup);
         private GetGroupTimerDelegate getGroupTimer;
@@ -98,9 +95,6 @@ namespace MOAction
             Stacks = new();
 
             pluginLog.Info("===== M O A C T I O N =====");
-            pluginLog.Debug("SetUiMouseoverEntityId address {SetUiMouseoverEntityId}", Address.SetUiMouseoverEntityId);
-
-            uiMoEntityIdHook = hookprovider.HookFromAddress(Address.SetUiMouseoverEntityId, new OnSetUiMouseoverEntityId(HandleUiMoEntityId));
 
             enabledActions = new();
         }
@@ -134,25 +128,17 @@ namespace MOAction
             AM = null;
         }
 
-        private unsafe void HookUseAction()
+        public void Enable()
         {
-            //read current bytes at GtQueuePatch for Dispose
+                        //read current bytes at GtQueuePatch for Dispose
             SafeMemory.ReadBytes(Address.GtQueuePatch, 2, out var prePatch);
             Address.preGtQueuePatchData = prePatch;
 
             //Apply 2 NOOP actions there (0x90 is noop right?)
             SafeMemory.WriteBytes(Address.GtQueuePatch, new byte[] { 0x90, 0x90 });
 
-
             requestActionHook = hookprovider.HookFromAddress((IntPtr)ActionManager.Addresses.UseAction.Value, new OnRequestActionDetour(HandleRequestAction));
             requestActionHook.Enable();
-        }
-
-        public void Enable()
-        {
-            uiMoEntityIdHook.Enable();
-
-            HookUseAction();
         }
 
         public void Dispose()
@@ -160,7 +146,6 @@ namespace MOAction
             if (requestActionHook.IsEnabled)
             {
                 requestActionHook.Dispose();
-                uiMoEntityIdHook.Dispose();
 
                 //re-write the original 2 bytes that were there
                 //6.5: 0x75 , 0x49 (when printed out i got "uI", and referencing a hex table that'd be 0x75 and 0x49) but this would mean I don't need to know this anymore.
@@ -173,11 +158,6 @@ namespace MOAction
             return group < 1 ? null : getGroupTimer(AM, group - 1);
         }
 
-        private void HandleUiMoEntityId(long param1, long param2)
-        {
-            uiMoEntityId = (IntPtr)param2;
-            uiMoEntityIdHook.Original(param1, param2);
-        }
 
         private unsafe bool HandleRequestAction(long param_1, byte actionType, ulong actionID, long target_ptr,
                        uint param_5, uint param_6, uint param_7, long param_8)
@@ -327,7 +307,8 @@ namespace MOAction
 
         public GameObject GetGuiMoPtr()
         {
-            return objectTable.CreateObjectReference(uiMoEntityId);
+            //return objectTable.CreateObjectReference(uiMoEntityId);
+            return targetManager.MouseOverNameplateTarget;
         }
         public GameObject GetFocusPtr()
         {
@@ -337,7 +318,10 @@ namespace MOAction
         {
             return targetManager.Target;
         }
-        public GameObject NewFieldMo() => targetManager.MouseOverTarget;
+        public GameObject getFieldMo()
+        {
+            return targetManager.MouseOverTarget;
+        }
 
         public unsafe GameObject GetActorFromPlaceholder(string placeholder)
         {
