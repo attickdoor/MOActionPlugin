@@ -19,7 +19,7 @@ namespace MOAction
     public class MOAction
     {
         private readonly Dictionary<uint, Lumina.Excel.GeneratedSheets.ClassJob> JobDictionary;
-        public delegate bool OnRequestActionDetour(long param_1, byte param_2, ulong param_3, long param_4,
+        public delegate bool OnRequestActionDetour(long param_1, byte param_2, ulong param_3, ulong param_4,
                        uint param_5, uint param_6, uint param_7, long param_8);
 
         [UnmanagedFunctionPointer(CallingConvention.ThisCall, CharSet = CharSet.Ansi)]
@@ -156,7 +156,7 @@ namespace MOAction
         }
 
 
-        private unsafe bool HandleRequestAction(long param_1, byte actionType, ulong actionID, long target_ptr,
+        private unsafe bool HandleRequestAction(long param_1, byte actionType, ulong actionID, ulong target_ptr,
                        uint param_5, uint param_6, uint param_7, long param_8)
         {
             // Only care about "real" actions. Not doing anything dodgy
@@ -173,7 +173,7 @@ namespace MOAction
                 return requestActionHook.Original(param_1, actionType, actionID, target_ptr, param_5, param_6, param_7, param_8);
             }
 
-            long objectId = target == null ? 0xE0000000 : target.ObjectId;
+            ulong objectId = target == null ? 0xE0000000 : target.GameObjectId;
             pluginLog.Verbose("Execution Action {action} with ActionID {actionid} on object with ObjectId {objectid}", action.Name, action.RowId, objectId);
 
             bool ret = requestActionHook.Original(param_1, actionType, action.RowId, objectId, param_5, param_6, param_7, param_8);
@@ -181,13 +181,13 @@ namespace MOAction
             // Enqueue GT action
             if (action.TargetArea)
             {
-                *(long*)((IntPtr)actionManager + 0x98) = objectId;
+                *(ulong*)((IntPtr)actionManager + 0x98) = objectId;
                 *(byte*)((IntPtr)actionManager + 0xB8) = 1;
             }
             return ret;
         }
 
-        private unsafe (Lumina.Excel.GeneratedSheets.Action action, GameObject target) GetActionTarget(uint ActionID, uint ActionType)
+        private unsafe (Lumina.Excel.GeneratedSheets.Action action, IGameObject target) GetActionTarget(uint ActionID, uint ActionType)
         {
             var action = RawActions.GetRow(ActionID);
 
@@ -238,7 +238,7 @@ namespace MOAction
             return (null, null);
         }
 
-        private unsafe (bool, GameObject Target) CanUseAction(StackEntry targ, uint actionType)
+        private unsafe (bool, IGameObject Target) CanUseAction(StackEntry targ, uint actionType)
         {
             if (targ.Target == null || targ.Action == null) return (false, null);
 
@@ -302,24 +302,24 @@ namespace MOAction
             return (gameCanUseActionResponse, target);
         }
 
-        public unsafe GameObject GetGuiMoPtr()
+        public unsafe IGameObject GetGuiMoPtr()
         {
             return objectTable.CreateObjectReference((IntPtr)pronounModule -> UiMouseOverTarget);
         }
-        public GameObject GetFocusPtr()
+        public IGameObject GetFocusPtr()
         {
             return targetManager.FocusTarget;
         }
-        public GameObject GetRegTargPtr()
+        public IGameObject GetRegTargPtr()
         {
             return targetManager.Target;
         }
-        public GameObject getFieldMo()
+        public IGameObject getFieldMo()
         {
             return targetManager.MouseOverTarget;
         }
 
-        public unsafe GameObject GetActorFromPlaceholder(string placeholder)
+        public unsafe IGameObject GetActorFromPlaceholder(string placeholder)
         {
             return objectTable.CreateObjectReference((IntPtr)pronounModule->ResolvePlaceholder(placeholder, 1, 0));
         }

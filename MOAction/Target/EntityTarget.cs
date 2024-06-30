@@ -12,9 +12,9 @@ namespace MOAction.Target
     {
         public EntityTarget(PtrFunc func, string name) : base(func, name) { }
         public EntityTarget(PtrFunc func, string name, bool objneed) : base(func, name, objneed) { }
-        public override GameObject GetTarget()
+        public override IGameObject GetTarget()
         {
-            GameObject obj = getPtr();
+            IGameObject obj = getPtr();
             if (IsTargetValid())
                 return obj;
                 //return (uint)Marshal.ReadInt32(ptr + 0x74);
@@ -23,7 +23,7 @@ namespace MOAction.Target
 
         public override bool IsTargetValid()
         {
-            GameObject obj = getPtr();
+            IGameObject obj = getPtr();
             return obj != null;
             //return (ptr != IntPtr.Zero || (int)ptr != 0);
         }

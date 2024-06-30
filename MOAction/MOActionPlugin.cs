@@ -30,7 +30,7 @@ namespace MOAction
 
         public MOActionConfiguration Configuration;
 
-        private DalamudPluginInterface pluginInterface;
+        private IDalamudPluginInterface pluginInterface;
         private MOAction moAction;
 
         private List<Lumina.Excel.GeneratedSheets.Action> applicableActions;
@@ -61,7 +61,7 @@ namespace MOAction
         private ICommandManager commandManager;
         private ISigScanner SigScanner;
 
-        unsafe public MOActionPlugin(DalamudPluginInterface pluginInterface,
+        unsafe public MOActionPlugin(IDalamudPluginInterface pluginInterface,
                                     ICommandManager commands,
                                     IDataManager datamanager,
                                     IGameGui gamegui,
