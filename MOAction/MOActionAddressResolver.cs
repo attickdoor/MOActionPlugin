@@ -15,7 +15,7 @@ namespace MOAction
         {
             
             if(enableGroundTargetQueuePatch){
-            GtQueuePatch = sig.ScanModule("75 49 44 8B C3 41 8B D6");
+            GtQueuePatch = sig.ScanModule("75 49 44 8B C7");
             }
             else{
                 GtQueuePatch = 0;
