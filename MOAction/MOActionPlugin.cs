@@ -30,7 +30,7 @@ namespace MOAction
 
         public MOActionConfiguration Configuration;
 
-        private DalamudPluginInterface pluginInterface;
+        private IDalamudPluginInterface pluginInterface;
         private MOAction moAction;
 
         private List<Lumina.Excel.GeneratedSheets.Action> applicableActions;
@@ -61,7 +61,7 @@ namespace MOAction
         private ICommandManager commandManager;
         private ISigScanner SigScanner;
 
-        unsafe public MOActionPlugin(DalamudPluginInterface pluginInterface,
+        unsafe public MOActionPlugin(IDalamudPluginInterface pluginInterface,
                                     ICommandManager commands,
                                     IDataManager datamanager,
                                     IGameGui gamegui,
@@ -141,7 +141,7 @@ namespace MOAction
             TargetTypes = new List<TargetType>
             {
                 new EntityTarget(moAction.GetGuiMoPtr, "UI Mouseover"),
-                new EntityTarget(moAction.NewFieldMo, "Field Mouseover"),
+                new EntityTarget(moAction.getFieldMo, "Field Mouseover"),
                 new EntityTarget(() => moAction.GetActorFromPlaceholder("<t>"), "Target"),
                 new EntityTarget(() => moAction.GetActorFromPlaceholder("<f>"), "Focus Target"),
                 new EntityTarget(() => moAction.GetActorFromPlaceholder("<tt>"), "Target of Target"),
