@@ -4,15 +4,22 @@ using System.Runtime.InteropServices;
 
 namespace MOAction
 {
+
     public class MOActionAddressResolver
     {
         public IntPtr GtQueuePatch { get; private set; }
 
         public byte[] preGtQueuePatchData {get; set;}
 
-        public MOActionAddressResolver(ISigScanner sig)
+        public MOActionAddressResolver(ISigScanner sig, bool enableGroundTargetQueuePatch)
         {
+            
+            if(enableGroundTargetQueuePatch){
             GtQueuePatch = sig.ScanModule("75 49 44 8B C3 41 8B D6");
+            }
+            else{
+                GtQueuePatch = 0;
+            }
         }
 
         [StructLayout(LayoutKind.Explicit, Size = 0x14)]

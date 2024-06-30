@@ -18,6 +18,8 @@ namespace MOAction
 {
     public class MOAction
     {
+
+        private bool enableGroundTargetQueuePatch = false;
         private readonly Dictionary<uint, Lumina.Excel.GeneratedSheets.ClassJob> JobDictionary;
         public delegate bool OnRequestActionDetour(long param_1, byte param_2, ulong param_3, ulong param_4,
                        uint param_5, uint param_6, uint param_7, long param_8);
@@ -55,7 +57,6 @@ namespace MOAction
 
         private unsafe PronounModule* pronounModule;
         private unsafe ActionManager* actionManager;
-        private readonly int IdOffset = (int)Marshal.OffsetOf<FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject>("ObjectID");
 
         public MOAction(ISigScanner scanner,
                         IClientState clientstate,
@@ -69,7 +70,7 @@ namespace MOAction
                         Dictionary<uint, Lumina.Excel.GeneratedSheets.ClassJob> JobDictionary
                         )
         {
-            Address = new(scanner);
+            Address = new(scanner, enableGroundTargetQueuePatch);
             clientstate.Login += LoadClientModules;
             clientstate.Logout += ClearClientModules;
             if (clientstate.IsLoggedIn)
@@ -127,12 +128,16 @@ namespace MOAction
 
         public void Enable()
         {
+
+            pluginLog.Info("GTQueuePatch is currently {abled}", enableGroundTargetQueuePatch ? "enabled" : "disabled" );
+            if(enableGroundTargetQueuePatch){
             //read current bytes at GtQueuePatch for Dispose
             SafeMemory.ReadBytes(Address.GtQueuePatch, 2, out var prePatch);
             Address.preGtQueuePatchData = prePatch;
 
             //Apply 2 NOOP actions there (0x90 is noop right?)
             SafeMemory.WriteBytes(Address.GtQueuePatch, new byte[] { 0x90, 0x90 });
+            }
 
             requestActionHook = hookprovider.HookFromAddress((IntPtr)ActionManager.Addresses.UseAction.Value, new OnRequestActionDetour(HandleRequestAction));
             requestActionHook.Enable();
@@ -144,9 +149,11 @@ namespace MOAction
             {
                 requestActionHook.Dispose();
 
+                if(enableGroundTargetQueuePatch){
                 //re-write the original 2 bytes that were there
                 //6.5: 0x75 , 0x49 (when printed out i got "uI", and referencing a hex table that'd be 0x75 and 0x49) but this would mean I don't need to know this anymore.
                 SafeMemory.WriteBytes(Address.GtQueuePatch, Address.preGtQueuePatchData);
+                }
             }
         }
 
