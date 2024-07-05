@@ -27,34 +27,25 @@ namespace MOAction
     internal class MOActionPlugin : IDalamudPlugin
     {
         public string Name => "Mouseover Action Plugin";
-
         public MOActionConfiguration Configuration;
-
         private IDalamudPluginInterface pluginInterface;
         private MOAction moAction;
-
         private List<Lumina.Excel.GeneratedSheets.Action> applicableActions;
         private List<TargetType> TargetTypes;
         private List<TargetType> GroundTargetTypes;
         private List<MoActionStack> NewStacks;
         private Dictionary<string, HashSet<MoActionStack>> SavedStacks;
         private Dictionary<string, List<MoActionStack>> SortedStacks;
-
         private bool firstTimeUpgrade = false;
         private bool rangeCheck;
         private bool mouseClamp;
         private bool otherGroundClamp;
-
         private readonly Lumina.Excel.GeneratedSheets.ClassJob[] Jobs;
         private readonly List<Lumina.Excel.GeneratedSheets.ClassJob> JobAbbreviations;
         private readonly uint[] GroundTargets = { 3569, 3639, 188, 7439, 2262 };
-
         private Dictionary<string, List<Lumina.Excel.GeneratedSheets.Action>> JobActions;
-
         private bool isImguiMoSetupOpen = false;
-
         private readonly int CURRENT_CONFIG_VERSION = 6;
-
         private IClientState clientState;
         private ITargetManager targetManager;
         private IDataManager dataManager;
@@ -555,14 +546,6 @@ namespace MOAction
                     SavedStacks[x.GetJob(dataManager)].Add(x);
             }
             NewStacks.Clear();
-            /*
-            foreach (var (k, v) in SortedStacks)
-            {
-                foreach (var tmp in v)
-                    SavedStacks[k].Add(tmp);
-                SortedStacks[k].Sort();
-            }
-            */
             foreach (var (k, v) in SavedStacks)
             {
                 var tmp = v.ToList();
@@ -613,10 +596,7 @@ namespace MOAction
         public void Dispose()
         {
             moAction.Dispose();
-
             commandManager.RemoveHandler("/pmoaction");
-
-            //pluginInterface.Dispose();
         }
 
         private void OnCommandDebugMouseover(string command, string arguments)

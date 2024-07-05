@@ -18,33 +18,23 @@ namespace MOAction
 {
     public class MOAction
     {
-
         private bool enableGroundTargetQueuePatch = true;
         private readonly Dictionary<uint, Lumina.Excel.GeneratedSheets.ClassJob> JobDictionary;
         public delegate bool OnRequestActionDetour(long param_1, byte param_2, ulong param_3, ulong param_4,
                        uint param_5, uint param_6, uint param_7, long param_8);
-
         [UnmanagedFunctionPointer(CallingConvention.ThisCall, CharSet = CharSet.Ansi)]
         private delegate ulong ResolvePlaceholderActor(long param1, string param2, byte param3, byte param4);
-
         private readonly MOActionAddressResolver Address;
         private MOActionConfiguration Configuration;
-
         private Hook<OnRequestActionDetour> requestActionHook;
-
         public unsafe delegate RecastTimer* GetGroupTimerDelegate(void* @this, int cooldownGroup);
         private GetGroupTimerDelegate getGroupTimer;
-
         public List<MoActionStack> Stacks { get; set; }
         private Lumina.Excel.ExcelSheet<Lumina.Excel.GeneratedSheets.Action> RawActions;
-
         public IntPtr uiMoEntityId = IntPtr.Zero;
-
         public HashSet<ulong> enabledActions;
-
         public bool IsGuiMOEnabled = false;
         public bool IsFieldMOEnabled = false;
-
         private IClientState clientState;
         private ITargetManager targetManager;
         private IDataManager dataManager;
@@ -54,7 +44,6 @@ namespace MOAction
         private IKeyState keyState;
         private IGameInteropProvider hookprovider;
         private IPluginLog pluginLog;
-
         private unsafe PronounModule* pronounModule;
         private unsafe ActionManager* actionManager;
 
@@ -77,12 +66,8 @@ namespace MOAction
             {
                 LoadClientModules();
             }
-
-
             dataManager = datamanager;
-
             RawActions = dataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>();
-
             targetManager = targetmanager;
             clientState = clientstate;
             objectTable = objects;
@@ -91,11 +76,8 @@ namespace MOAction
             this.hookprovider = hookprovider;
             this.pluginLog = pluginLog;
             this.JobDictionary = JobDictionary;
-
             Stacks = new();
-
             pluginLog.Info("===== M O A C T I O N =====");
-
             enabledActions = new();
         }
 
@@ -128,17 +110,15 @@ namespace MOAction
 
         public void Enable()
         {
+            pluginLog.Info("GTQueuePatch is currently {abled}", enableGroundTargetQueuePatch ? "enabled" : "disabled");
+            if (enableGroundTargetQueuePatch)
+            {
+                //read current bytes at GtQueuePatch for Dispose
+                SafeMemory.ReadBytes(Address.GtQueuePatch, 2, out var prePatch);
+                Address.preGtQueuePatchData = prePatch;
 
-            pluginLog.Info("GTQueuePatch is currently {abled}", enableGroundTargetQueuePatch ? "enabled" : "disabled" );
-            if(enableGroundTargetQueuePatch){
-            //read current bytes at GtQueuePatch for Dispose
-            SafeMemory.ReadBytes(Address.GtQueuePatch, 2, out var prePatch);
-            Address.preGtQueuePatchData = prePatch;
-
-            //Apply 2 NOOP actions there (0x90 is noop right?)
-            SafeMemory.WriteBytes(Address.GtQueuePatch, new byte[] { 0x90, 0x90 });
+                SafeMemory.WriteBytes(Address.GtQueuePatch, new byte[] { 0x90, 0x90 });
             }
-
             requestActionHook = hookprovider.HookFromAddress((IntPtr)ActionManager.Addresses.UseAction.Value, new OnRequestActionDetour(HandleRequestAction));
             requestActionHook.Enable();
         }
@@ -148,11 +128,10 @@ namespace MOAction
             if (requestActionHook.IsEnabled)
             {
                 requestActionHook.Dispose();
-
-                if(enableGroundTargetQueuePatch){
-                //re-write the original 2 bytes that were there
-                //6.5: 0x75 , 0x49 (when printed out i got "uI", and referencing a hex table that'd be 0x75 and 0x49) but this would mean I don't need to know this anymore.
-                SafeMemory.WriteBytes(Address.GtQueuePatch, Address.preGtQueuePatchData);
+                if (enableGroundTargetQueuePatch)
+                {
+                    //re-write the original 2 bytes that were there
+                    SafeMemory.WriteBytes(Address.GtQueuePatch, Address.preGtQueuePatchData);
                 }
             }
         }
@@ -161,7 +140,6 @@ namespace MOAction
         {
             return group < 1 ? null : getGroupTimer(actionManager, group - 1);
         }
-
 
         private unsafe bool HandleRequestAction(long param_1, byte actionType, ulong actionID, ulong target_ptr,
                        uint param_5, uint param_6, uint param_7, long param_8)
@@ -206,9 +184,6 @@ namespace MOAction
                                                           entry.BaseAction.RowId == adjusted ||
                                                           actionManager->GetAdjustedActionId(entry.BaseAction.RowId) == adjusted)
                                                           && (clientState.LocalPlayer.ClassJob.Id == UInt32.Parse(entry.Job)
-                                                          //FUCK this wasn't easy to get WHM stacks to work on CNJ, ....
-                                                          //This works by grabbing parentJob. ParentJob is either a self-reference OR a reference to the non-upgraded class.
-                                                          //row ids and job ids are equal, so your classjob.id of 6 = CNJ -> Jobdictionary[24].ClassjobParent (this be CNJ with row 6)
                                                           || clientState.LocalPlayer.ClassJob.Id == JobDictionary[UInt32.Parse(entry.Job)].ClassJobParent.Row
                                                           ));
 
@@ -279,7 +254,6 @@ namespace MOAction
                 else if (err != 0 && err != 565) return (false, target);
             }
 
-            //Skip actions you cannot use when synced down, excluding role actions that can be used even when syncing down.
             pluginLog.Verbose("is {actionname} a role action?: {answer}", action.Name, action.IsRoleAction);
             if (!action.IsRoleAction)
             {
@@ -287,13 +261,9 @@ namespace MOAction
                 if (action.ClassJobLevel > clientState.LocalPlayer.Level) return (false, target);
             }
 
-            //area of effect spells do not require a target to work.
             pluginLog.Verbose("is {actionname} a area spell/ability? {answer}", action.Name, action.TargetArea);
             if (action.TargetArea) return (true, target);
 
-
-
-            //sanity check on spells that can not be used on friendly, hostile or party
             bool selfOnlyTargetAction = !action.CanTargetFriendly && !action.CanTargetHostile && !action.CanTargetParty;
             pluginLog.Verbose("Can {actionname} target: friendly - {friendly}, hostile  - {hostile}, party  - {party}, dead - {dead}, self - {self}", action.Name, action.CanTargetFriendly, action.CanTargetHostile, action.CanTargetParty, action.CanTargetDead, action.CanTargetSelf);
             if (selfOnlyTargetAction)
@@ -302,7 +272,6 @@ namespace MOAction
                 target = clientState.LocalPlayer;
             }
 
-            //handoff to game native code, returns true if the actionManager declares that the action can be used on the target specified
             bool gameCanUseActionResponse = ActionManager.CanUseActionOnTarget(action.RowId, (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)target.Address);
             pluginLog.Verbose("can I use action: {rowid} with name {actionname} on target {targetid} with name {targetname} : {response}", action.RowId.ToString(), action.Name, target.DataId, target.Name, gameCanUseActionResponse);
 
@@ -311,7 +280,7 @@ namespace MOAction
 
         public unsafe IGameObject GetGuiMoPtr()
         {
-            return objectTable.CreateObjectReference((IntPtr)pronounModule -> UiMouseOverTarget);
+            return objectTable.CreateObjectReference((IntPtr)pronounModule->UiMouseOverTarget);
         }
         public IGameObject GetFocusPtr()
         {

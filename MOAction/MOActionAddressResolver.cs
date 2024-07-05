@@ -8,14 +8,12 @@ namespace MOAction
     public class MOActionAddressResolver
     {
         public IntPtr GtQueuePatch { get; private set; }
-
-        public byte[] preGtQueuePatchData {get; set;}
+        public byte[] preGtQueuePatchData { get; set; }
 
         public MOActionAddressResolver(ISigScanner sig, bool enableGroundTargetQueuePatch)
         {
-            
-            if(enableGroundTargetQueuePatch){
-            GtQueuePatch = sig.ScanModule("75 49 44 8B C7");
+            if (enableGroundTargetQueuePatch){
+                GtQueuePatch = sig.ScanModule("75 49 44 8B C7");
             }
             else{
                 GtQueuePatch = 0;
