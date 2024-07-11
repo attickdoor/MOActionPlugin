@@ -9,7 +9,7 @@ namespace MOAction.Target
 {
     public abstract class TargetType
     {
-        public delegate GameObject PtrFunc();
+        public delegate IGameObject PtrFunc();
         public PtrFunc getPtr;
         public string TargetName;
         public bool ObjectNeeded;
@@ -28,7 +28,7 @@ namespace MOAction.Target
             ObjectNeeded = objneed;
         }
 
-        public abstract GameObject GetTarget();
+        public abstract IGameObject GetTarget();
         public abstract bool IsTargetValid();
 
         public override string ToString() => TargetName;

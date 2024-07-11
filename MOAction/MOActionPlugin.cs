@@ -27,41 +27,32 @@ namespace MOAction
     internal class MOActionPlugin : IDalamudPlugin
     {
         public string Name => "Mouseover Action Plugin";
-
         public MOActionConfiguration Configuration;
-
-        private DalamudPluginInterface pluginInterface;
+        private IDalamudPluginInterface pluginInterface;
         private MOAction moAction;
-
         private List<Lumina.Excel.GeneratedSheets.Action> applicableActions;
         private List<TargetType> TargetTypes;
         private List<TargetType> GroundTargetTypes;
         private List<MoActionStack> NewStacks;
         private Dictionary<string, HashSet<MoActionStack>> SavedStacks;
         private Dictionary<string, List<MoActionStack>> SortedStacks;
-
         private bool firstTimeUpgrade = false;
         private bool rangeCheck;
         private bool mouseClamp;
         private bool otherGroundClamp;
-
         private readonly Lumina.Excel.GeneratedSheets.ClassJob[] Jobs;
         private readonly List<Lumina.Excel.GeneratedSheets.ClassJob> JobAbbreviations;
         private readonly uint[] GroundTargets = { 3569, 3639, 188, 7439, 2262 };
-
         private Dictionary<string, List<Lumina.Excel.GeneratedSheets.Action>> JobActions;
-
         private bool isImguiMoSetupOpen = false;
-
         private readonly int CURRENT_CONFIG_VERSION = 6;
-
         private IClientState clientState;
         private ITargetManager targetManager;
         private IDataManager dataManager;
         private ICommandManager commandManager;
         private ISigScanner SigScanner;
 
-        unsafe public MOActionPlugin(DalamudPluginInterface pluginInterface,
+        unsafe public MOActionPlugin(IDalamudPluginInterface pluginInterface,
                                     ICommandManager commands,
                                     IDataManager datamanager,
                                     IGameGui gamegui,
@@ -129,7 +120,8 @@ namespace MOAction
                                     keystate, 
                                     gamegui,
                                     hookprovider, 
-                                    pluginLog);
+                                    pluginLog,
+                                    Jobs.ToDictionary(item => item.RowId));
 
             foreach (var jobname in JobAbbreviations)
             {
@@ -140,7 +132,7 @@ namespace MOAction
             TargetTypes = new List<TargetType>
             {
                 new EntityTarget(moAction.GetGuiMoPtr, "UI Mouseover"),
-                new EntityTarget(moAction.NewFieldMo, "Field Mouseover"),
+                new EntityTarget(moAction.getFieldMo, "Field Mouseover"),
                 new EntityTarget(() => moAction.GetActorFromPlaceholder("<t>"), "Target"),
                 new EntityTarget(() => moAction.GetActorFromPlaceholder("<f>"), "Focus Target"),
                 new EntityTarget(() => moAction.GetActorFromPlaceholder("<tt>"), "Target of Target"),
@@ -554,14 +546,6 @@ namespace MOAction
                     SavedStacks[x.GetJob(dataManager)].Add(x);
             }
             NewStacks.Clear();
-            /*
-            foreach (var (k, v) in SortedStacks)
-            {
-                foreach (var tmp in v)
-                    SavedStacks[k].Add(tmp);
-                SortedStacks[k].Sort();
-            }
-            */
             foreach (var (k, v) in SavedStacks)
             {
                 var tmp = v.ToList();
@@ -612,10 +596,7 @@ namespace MOAction
         public void Dispose()
         {
             moAction.Dispose();
-
             commandManager.RemoveHandler("/pmoaction");
-
-            //pluginInterface.Dispose();
         }
 
         private void OnCommandDebugMouseover(string command, string arguments)
