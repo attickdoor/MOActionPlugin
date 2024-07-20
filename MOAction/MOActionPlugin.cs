@@ -14,6 +14,7 @@ using System.Text;
 using Newtonsoft.Json;
 using Dalamud.Plugin.Services;
 using Dalamud.Game;
+using Dalamud.IoC;
 
 namespace MOAction
 {
@@ -26,9 +27,20 @@ namespace MOAction
     // Proceed with this warning in mind.
     internal class MOActionPlugin : IDalamudPlugin
     {
+        [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
+        [PluginService] internal static IClientState ClientState { get; private set; } = null!;
+        [PluginService] internal static ITargetManager TargetManager { get; private set; } = null!;
+        [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
+        [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
+        [PluginService] internal static ISigScanner SigScanner { get; private set; } = null!;
+        [PluginService] internal static IPluginLog PluginLog { get; private set; } = null!;
+        [PluginService] internal static IGameInteropProvider HookProvider { get; private set; } = null!;
+        [PluginService] internal static IObjectTable Objects { get; private set; } = null!;
+        [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
+        [PluginService] internal static IKeyState KeyState { get; private set; } = null!;
         public string Name => "Mouseover Action Plugin";
         public MOActionConfiguration Configuration;
-        private IDalamudPluginInterface pluginInterface;
+        
         private MOAction moAction;
         private List<Lumina.Excel.GeneratedSheets.Action> applicableActions;
         private List<TargetType> TargetTypes;
@@ -46,55 +58,31 @@ namespace MOAction
         private Dictionary<string, List<Lumina.Excel.GeneratedSheets.Action>> JobActions;
         private bool isImguiMoSetupOpen = false;
         private readonly int CURRENT_CONFIG_VERSION = 6;
-        private IClientState clientState;
-        private ITargetManager targetManager;
-        private IDataManager dataManager;
-        private ICommandManager commandManager;
-        private ISigScanner SigScanner;
+        
+        
 
-        unsafe public MOActionPlugin(IDalamudPluginInterface pluginInterface,
-                                    ICommandManager commands,
-                                    IDataManager datamanager,
-                                    IGameGui gamegui,
-                                    IKeyState keystate,
-                                    IObjectTable objects,
-                                    ISigScanner scanner,
-                                    IClientState clientstate,
-                                    ITargetManager targetmanager,
-                                    IPluginLog pluginLog,
-                                    IGameInteropProvider hookprovider
-                                        )
+        unsafe public MOActionPlugin()
         {
-            this.pluginInterface = pluginInterface;
-
-            commands.AddHandler("/pmoaction", new CommandInfo(OnCommandDebugMouseover)
+            CommandManager.AddHandler("/pmoaction", new CommandInfo(OnCommandDebugMouseover)
             {
                 HelpMessage = "Open a window to edit mouseover action settings.",
                 ShowInHelp = true
             });
 
             applicableActions = new List<Lumina.Excel.GeneratedSheets.Action>();
-            clientState = clientstate;
-            dataManager = datamanager;
-            targetManager = targetmanager;
-            commandManager = commands;
-            SigScanner = scanner;
 
-            Jobs = dataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.ClassJob>().Where(x => x.JobIndex > 0).ToArray();
+            Jobs = DataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.ClassJob>().Where(x => x.JobIndex > 0).ToArray();
             JobAbbreviations = Jobs.ToList();
             JobAbbreviations.Sort((x, y) => x.Abbreviation.ToString().CompareTo(y.Abbreviation.ToString()));
             NewStacks = new();
             SavedStacks = new();
             SortedStacks = new();
-            var x = dataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>().Where(row => row.IsPlayerAction && !row.IsPvP && row.ClassJobLevel > 0).ToList();
+            var x = DataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>().Where(row => row.IsPlayerAction && !row.IsPvP && row.ClassJobLevel > 0).ToList();
             foreach (var a in x)
             {
                 // random old ability still marked as usable?
                 if (a.RowId == 212)
                     continue;
-                // compatability with xivcombo, enochian turns into f/b4
-                if (a.RowId == 3575)
-                    a.CanTargetHostile = true;
                 // Ley Lines, Between the Lines, and Passage of Arms are not true ground target
                 else if (a.RowId == 3573 || a.RowId == 7385 || a.RowId == 7419)
                     a.TargetArea = false;
@@ -113,14 +101,14 @@ namespace MOAction
             JobActions = new();
             SortActions();
             moAction = new MOAction(SigScanner,
-                                    clientState, 
-                                    dataManager, 
-                                    targetManager, 
-                                    objects, 
-                                    keystate, 
-                                    gamegui,
-                                    hookprovider, 
-                                    pluginLog,
+                                    ClientState, 
+                                    DataManager, 
+                                    TargetManager, 
+                                    Objects, 
+                                    KeyState, 
+                                    GameGui,
+                                    HookProvider, 
+                                    PluginLog,
                                     Jobs.ToDictionary(item => item.RowId));
 
             foreach (var jobname in JobAbbreviations)
@@ -151,7 +139,7 @@ namespace MOAction
                 new EntityTarget(() => null, "Mouse Location", false),
             };
 
-            var config = pluginInterface.GetPluginConfig() as MOActionConfiguration ?? new MOActionConfiguration();
+            var config = PluginInterface.GetPluginConfig() as MOActionConfiguration ?? new MOActionConfiguration();
 
             // big upgrade for old moaction config
             if (config.Version < 6)
@@ -167,9 +155,9 @@ namespace MOAction
                     int tmp;
                     if (!int.TryParse(y.Job, out tmp))
                     {
-                        var q = dataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.ClassJob>().FirstOrDefault(z => z.Abbreviation == y.Job);
+                        var q = DataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.ClassJob>().FirstOrDefault(z => z.Abbreviation == y.Job);
                         if (q != default)
-                            y.Job = dataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.ClassJob>().First(z => z.Abbreviation == y.Job).RowId.ToString();
+                            y.Job = DataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.ClassJob>().First(z => z.Abbreviation == y.Job).RowId.ToString();
                         else
                         {
                             config.Stacks.Remove(y);
@@ -200,11 +188,11 @@ namespace MOAction
             {
                 moAction.Stacks.AddRange(entry.Value);
             }
-            pluginInterface.UiBuilder.OpenConfigUi += () => isImguiMoSetupOpen = true;
-            pluginInterface.UiBuilder.Draw += UiBuilder_OnBuildUi;
+            PluginInterface.UiBuilder.OpenConfigUi += () => isImguiMoSetupOpen = true;
+            PluginInterface.UiBuilder.Draw += UiBuilder_OnBuildUi;
+            PluginInterface.UiBuilder.OpenMainUi += () => isImguiMoSetupOpen = true;
 
         }
-
 
         private void UiBuilder_OnBuildUi()
         {
@@ -240,14 +228,14 @@ namespace MOAction
                 {
                     ImGui.SetNextItemWidth(100);
                     // Require user to select a job, filtering actions down.
-                    if (ImGui.BeginCombo("Job", entry.GetJob(dataManager)))
+                    if (ImGui.BeginCombo("Job", entry.GetJob(DataManager)))
                     {
                         foreach (var x in JobAbbreviations)
                         {
                             string job = x.Abbreviation;
                             if (ImGui.Selectable(job))
                             {
-                                if (entry.GetJob(dataManager) != null && entry.GetJob(dataManager) != job)
+                                if (entry.GetJob(DataManager) != null && entry.GetJob(DataManager) != job)
                                 {
                                     entry.BaseAction = null;
                                     foreach (var stackentry in entry.Entries)
@@ -271,14 +259,14 @@ namespace MOAction
                         }
                         ImGui.EndCombo();
                     }
-                    if (entry.GetJob(dataManager) != "Unset Job")
+                    if (entry.GetJob(DataManager) != "Unset Job")
                     {
                         ImGui.Indent();
                         // Select base action.
                         ImGui.SetNextItemWidth(200);
                         if (ImGui.BeginCombo("Base Action", entry.BaseAction == null ? "" : entry.BaseAction.Name))
                         {
-                            foreach (var actionEntry in JobActions[entry.GetJob(dataManager)])
+                            foreach (var actionEntry in JobActions[entry.GetJob(DataManager)])
                             {
                                 if (ImGui.Selectable(actionEntry.Name))
                                 {
@@ -331,7 +319,7 @@ namespace MOAction
                                 ImGui.SetNextItemWidth(200);
                                 if (ImGui.BeginCombo("Ability", stackEntry.Action == null ? "" : stackEntry.Action.Name))
                                 {
-                                    foreach (var ability in JobActions[entry.GetJob(dataManager)])
+                                    foreach (var ability in JobActions[entry.GetJob(DataManager)])
                                     {
                                         if (ImGui.Selectable(ability.Name))
                                         {
@@ -373,7 +361,7 @@ namespace MOAction
                             if (ImGui.Button("Delete Stack"))
                             {
                                 list.Remove(entry);
-                                SavedStacks[entry.GetJob(dataManager)].Remove(entry);
+                                SavedStacks[entry.GetJob(DataManager)].Remove(entry);
                                 i--;
                             }
                         }
@@ -404,7 +392,7 @@ namespace MOAction
             foreach (var x in JobAbbreviations)
             {
                 var name = x.Abbreviation;
-                var jobstack = list.Where(x => x.GetJob(dataManager) == name).ToList();
+                var jobstack = list.Where(x => x.GetJob(DataManager) == name).ToList();
                 if (jobstack.Count > 0)
                     toReturn[name] = new(jobstack);
                 else
@@ -524,10 +512,10 @@ namespace MOAction
             ImGui.SameLine();
             if (ImGui.Button("New Stack"))
             {
-                if (clientState.LocalPlayer != null)
+                if (ClientState.LocalPlayer != null)
                 {
                     MoActionStack stack = new(null, null);
-                    stack.Job = clientState.LocalPlayer.ClassJob.Id.ToString();
+                    stack.Job = ClientState.LocalPlayer.ClassJob.Id.ToString();
                     NewStacks.Add(stack);
                 }
                 else
@@ -543,7 +531,7 @@ namespace MOAction
             foreach (var x in NewStacks)
             {
                 if (x.Job != "Unset Job" && x.Entries.Count > 0)
-                    SavedStacks[x.GetJob(dataManager)].Add(x);
+                    SavedStacks[x.GetJob(DataManager)].Add(x);
             }
             NewStacks.Clear();
             foreach (var (k, v) in SavedStacks)
@@ -562,7 +550,7 @@ namespace MOAction
             Configuration.MouseClamp = mouseClamp;
             Configuration.OtherGroundClamp = otherGroundClamp;
 
-            pluginInterface.SavePluginConfig(Configuration);
+            PluginInterface.SavePluginConfig(Configuration);
         }
 
 
@@ -596,7 +584,7 @@ namespace MOAction
         public void Dispose()
         {
             moAction.Dispose();
-            commandManager.RemoveHandler("/pmoaction");
+            CommandManager.RemoveHandler("/pmoaction");
         }
 
         private void OnCommandDebugMouseover(string command, string arguments)

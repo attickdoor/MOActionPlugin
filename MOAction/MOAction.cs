@@ -38,7 +38,6 @@ namespace MOAction
         private IClientState clientState;
         private ITargetManager targetManager;
         private IDataManager dataManager;
-        private ICommandManager commandManager;
         public static IObjectTable objectTable;
         private IGameGui gameGui;
         private IKeyState keyState;
