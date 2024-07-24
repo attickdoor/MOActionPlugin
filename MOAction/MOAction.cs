@@ -190,11 +190,11 @@ namespace MOAction
             MoActionStack stackToUse = null;
             foreach (var entry in applicableActions)
             {
-                if (entry.Modifier == VirtualKey.NO_KEY)
+                if (entry.Modifier.Key == VirtualKey.NO_KEY)
                 {
                     stackToUse = entry;
                 }
-                else if (keyState[entry.Modifier])
+                else if (keyState[entry.Modifier.Key])
                 {
                     stackToUse = entry;
                     break;

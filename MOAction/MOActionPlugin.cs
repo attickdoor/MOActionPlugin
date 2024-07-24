@@ -260,11 +260,11 @@ namespace MOAction
                     }
                     ImGui.SameLine();
                     ImGui.SetNextItemWidth(100);
-                    if (ImGui.BeginCombo("Held Modifier Key", entry.Modifier.ToString()))
+                    if (ImGui.BeginCombo("Held Modifier Key", entry.Modifier.Value))
                     {
-                        foreach (VirtualKey vk in MoActionStack.AllKeys)
+                        foreach (var vk in MoActionStack.AllKeys.GetAllKeys())
                         {
-                            if (ImGui.Selectable(vk.ToString()))
+                            if (ImGui.Selectable(vk.Value))
                             {
                                 entry.Modifier = vk;
                             }
@@ -426,7 +426,7 @@ namespace MOAction
             }
             Configuration.Stacks.Clear();
             foreach (var x in moAction.Stacks)
-                Configuration.Stacks.Add(new ConfigurationEntry(x.BaseAction.RowId, x.Entries.Select(y => (y.Target.TargetName, y.Action.RowId)).ToList(), x.Modifier, x.Job));
+                Configuration.Stacks.Add(new ConfigurationEntry(x.BaseAction.RowId, x.Entries.Select(y => (y.Target.TargetName, y.Action.RowId)).ToList(), x.Modifier.Key, x.Job));
             UpdateConfig();
         }
 
@@ -587,7 +587,7 @@ namespace MOAction
                 }
                 MoActionStack tmp = new(action, entries);
                 tmp.Job = job;
-                tmp.Modifier = entry.Modifier;
+                tmp.Modifier = MoActionStack.AllKeys.Get(entry.Modifier);
                 toReturn.Add(tmp);
             }
 
