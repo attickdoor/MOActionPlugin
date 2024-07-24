@@ -38,7 +38,6 @@ namespace MOAction
         private IClientState clientState;
         private ITargetManager targetManager;
         private IDataManager dataManager;
-        private ICommandManager commandManager;
         public static IObjectTable objectTable;
         private IGameGui gameGui;
         private IKeyState keyState;
@@ -231,7 +230,9 @@ namespace MOAction
             var target = targ.Target.GetTarget();
             if (target == null)
             {
-                return (!targ.Target.ObjectNeeded, clientState.LocalPlayer);
+                if (targ.Target.ObjectNeeded)
+                    return (false, clientState.LocalPlayer);
+                return (true, null);
             }
 
             // Check if ability is on CD or not (charges are fun!)
