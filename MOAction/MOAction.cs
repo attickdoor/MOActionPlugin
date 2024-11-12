@@ -18,7 +18,7 @@ namespace MOAction
 {
     public class MOAction
     {
-        private bool enableGroundTargetQueuePatch = true;
+        private bool enableGroundTargetQueuePatch = false;
         private readonly Dictionary<uint, Lumina.Excel.GeneratedSheets.ClassJob> JobDictionary;
         public delegate bool OnRequestActionDetour(long param_1, byte param_2, ulong param_3, ulong param_4,
                        uint param_5, uint param_6, uint param_7, long param_8);
