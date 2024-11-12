@@ -40,9 +40,9 @@ namespace MOAction
         [PluginService] internal static IKeyState KeyState { get; private set; } = null!;
         public string Name => "Mouseover Action Plugin";
         public MOActionConfiguration Configuration;
-        
+
         private MOAction moAction;
-        private List<Lumina.Excel.GeneratedSheets.Action> applicableActions;
+        private List<Lumina.Excel.Sheets.Action> applicableActions;
         private List<TargetType> TargetTypes;
         private List<TargetType> GroundTargetTypes;
         private List<MoActionStack> NewStacks;
@@ -52,14 +52,13 @@ namespace MOAction
         private bool rangeCheck;
         private bool mouseClamp;
         private bool otherGroundClamp;
-        private readonly Lumina.Excel.GeneratedSheets.ClassJob[] Jobs;
-        private readonly List<Lumina.Excel.GeneratedSheets.ClassJob> JobAbbreviations;
-        private readonly uint[] GroundTargets = { 3569, 3639, 188, 7439, 2262 };
-        private Dictionary<string, List<Lumina.Excel.GeneratedSheets.Action>> JobActions;
+        private readonly Lumina.Excel.Sheets.ClassJob[] Jobs;
+        private readonly List<Lumina.Excel.Sheets.ClassJob> JobAbbreviations;
+        private Dictionary<string, List<Lumina.Excel.Sheets.Action>> JobActions;
         private bool isImguiMoSetupOpen = false;
         private readonly int CURRENT_CONFIG_VERSION = 6;
-        
-        
+
+
 
         unsafe public MOActionPlugin()
         {
@@ -69,51 +68,39 @@ namespace MOAction
                 ShowInHelp = true
             });
 
-            applicableActions = new List<Lumina.Excel.GeneratedSheets.Action>();
+            applicableActions = new List<Lumina.Excel.Sheets.Action>();
 
-            Jobs = DataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.ClassJob>().Where(x => x.JobIndex > 0).ToArray();
+            Jobs = DataManager.GetExcelSheet<Lumina.Excel.Sheets.ClassJob>().Where(x => x.JobIndex > 0).ToArray();
             JobAbbreviations = Jobs.ToList();
             JobAbbreviations.Sort((x, y) => x.Abbreviation.ToString().CompareTo(y.Abbreviation.ToString()));
             NewStacks = new();
             SavedStacks = new();
             SortedStacks = new();
-            var x = DataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>().Where(row => row.IsPlayerAction && !row.IsPvP && row.ClassJobLevel > 0).ToList();
+            var x = DataManager.GetExcelSheet<Lumina.Excel.Sheets.Action>().Where(row => row.IsPlayerAction && !row.IsPvP && row.ClassJobLevel > 0).ToList();
             foreach (var a in x)
             {
                 // random old ability still marked as usable?
                 if (a.RowId == 212)
                     continue;
-                // Ley Lines, Between the Lines, and Passage of Arms are not true ground target
-                else if (a.RowId == 3573 || a.RowId == 7385 || a.RowId == 7419)
-                    a.TargetArea = false;
-                // Other ground targets have to be able to target anything
-                else if (GroundTargets.Contains(a.RowId))
-                {
-                    a.CanTargetDead = true;
-                    a.CanTargetFriendly = true;
-                    a.CanTargetHostile = true;
-                    a.CanTargetParty = true;
-                    a.CanTargetSelf = true;
-                }
                 applicableActions.Add(a);
 
             }
             JobActions = new();
             SortActions();
             moAction = new MOAction(SigScanner,
-                                    ClientState, 
-                                    DataManager, 
-                                    TargetManager, 
-                                    Objects, 
-                                    KeyState, 
+                                    ClientState,
+                                    DataManager,
+                                    TargetManager,
+                                    Objects,
+                                    KeyState,
                                     GameGui,
-                                    HookProvider, 
+                                    HookProvider,
                                     PluginLog,
                                     Jobs.ToDictionary(item => item.RowId));
 
             foreach (var jobname in JobAbbreviations)
             {
-                JobActions.Add(jobname.Abbreviation, applicableActions.Where(action => action.ClassJobCategory.Value.Name.ToString().Contains(jobname.Name.ToString()) ||
+                JobActions.Add(jobname.Abbreviation.ToString(), applicableActions.Where(action => action.ClassJobCategory.Value.Name.ToString().Contains(jobname.Name.ToString()) ||
                 action.ClassJobCategory.Value.Name.ToString().Contains(jobname.Abbreviation.ToString())).ToList());
             }
 
@@ -155,9 +142,9 @@ namespace MOAction
                     int tmp;
                     if (!int.TryParse(y.Job, out tmp))
                     {
-                        var q = DataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.ClassJob>().FirstOrDefault(z => z.Abbreviation == y.Job);
-                        if (q != default)
-                            y.Job = DataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.ClassJob>().First(z => z.Abbreviation == y.Job).RowId.ToString();
+                        var q = DataManager.GetExcelSheet<Lumina.Excel.Sheets.ClassJob>().FirstOrDefault(z => z.Abbreviation == y.Job);
+                        if (q.RowId != default)
+                            y.Job = DataManager.GetExcelSheet<Lumina.Excel.Sheets.ClassJob>().First(z => z.Abbreviation == y.Job).RowId.ToString();
                         else
                         {
                             config.Stacks.Remove(y);
@@ -224,7 +211,7 @@ namespace MOAction
             {
                 ImGui.PushID(i);
                 var entry = list.ElementAt(i);
-                if (ImGui.CollapsingHeader(entry.BaseAction == null ? "Unset Action###" : entry.BaseAction.Name + "###"))
+                if (ImGui.CollapsingHeader(entry.BaseAction.RowId == 0 ? "Unset Action###" : entry.BaseAction.Name.ToString() + "###"))
                 {
                     ImGui.SetNextItemWidth(100);
                     // Require user to select a job, filtering actions down.
@@ -232,14 +219,14 @@ namespace MOAction
                     {
                         foreach (var x in JobAbbreviations)
                         {
-                            string job = x.Abbreviation;
+                            string job = x.Abbreviation.ToString();
                             if (ImGui.Selectable(job))
                             {
                                 if (entry.GetJob(DataManager) != null && entry.GetJob(DataManager) != job)
                                 {
-                                    entry.BaseAction = null;
+                                    entry.BaseAction = default;
                                     foreach (var stackentry in entry.Entries)
-                                        stackentry.Action = null;
+                                        stackentry.Action = default;
                                 }
                                 entry.Job = x.RowId.ToString();
                             }
@@ -259,16 +246,16 @@ namespace MOAction
                         }
                         ImGui.EndCombo();
                     }
-                    if (entry.GetJob(DataManager) != "Unset Job")
+                    if (entry.GetJob(DataManager) != "Unset Job" || entry.GetJob(DataManager) != "ADV")
                     {
                         ImGui.Indent();
                         // Select base action.
                         ImGui.SetNextItemWidth(200);
-                        if (ImGui.BeginCombo("Base Action", entry.BaseAction == null ? "" : entry.BaseAction.Name))
+                        if (ImGui.BeginCombo("Base Action", entry.BaseAction.RowId == default ? "" : entry.BaseAction.Name.ToString()))
                         {
                             foreach (var actionEntry in JobActions[entry.GetJob(DataManager)])
                             {
-                                if (ImGui.Selectable(actionEntry.Name))
+                                if (ImGui.Selectable(actionEntry.Name.ToString()))
                                 {
                                     entry.BaseAction = actionEntry;
                                     // By default, add UI mouseover as the first TargetType
@@ -284,7 +271,7 @@ namespace MOAction
                             }
                             ImGui.EndCombo();
                         }
-                        if (entry.BaseAction != null)
+                        if (entry.BaseAction.RowId != default)
                         {
                             ImGui.Indent();
                             for (int j = 0; j < entry.Entries.Count; j++)
@@ -317,11 +304,11 @@ namespace MOAction
                                 }
                                 ImGui.SameLine();
                                 ImGui.SetNextItemWidth(200);
-                                if (ImGui.BeginCombo("Ability", stackEntry.Action == null ? "" : stackEntry.Action.Name))
+                                if (ImGui.BeginCombo("Ability", stackEntry.Action.Name.ToString()))
                                 {
                                     foreach (var ability in JobActions[entry.GetJob(DataManager)])
                                     {
-                                        if (ImGui.Selectable(ability.Name))
+                                        if (ImGui.Selectable(ability.Name.ToString()))
                                         {
                                             stackEntry.Action = ability;
                                             if (ability.TargetArea && GroundTargetTypes.Contains(stackEntry.Target))
@@ -394,9 +381,9 @@ namespace MOAction
                 var name = x.Abbreviation;
                 var jobstack = list.Where(x => x.GetJob(DataManager) == name).ToList();
                 if (jobstack.Count > 0)
-                    toReturn[name] = new(jobstack);
+                    toReturn[name.ToString()] = new(jobstack);
                 else
-                    toReturn[name] = new();
+                    toReturn[name.ToString()] = new();
             }
             return toReturn;
         }
@@ -473,21 +460,21 @@ namespace MOAction
             foreach (var x in JobAbbreviations)
             {
                 var jobName = x.Abbreviation;
-                var entries = SavedStacks[jobName];
+                var entries = SavedStacks[jobName.ToString()];
                 if (entries.Count == 0) continue;
                 var key = jobName;
 
-                ImGui.PushID(key); //push job
+                ImGui.PushID(key.ToString()); //push job
 
                 ImGui.SetNextItemWidth(300);
-                if (ImGui.CollapsingHeader(key))
+                if (ImGui.CollapsingHeader(key.ToString()))
                 {
                     if (ImGui.Button("Copy All to Clipboard"))
                     {
                         CopyToClipboard(entries.ToList());
                     }
                     ImGui.Indent();
-                    DrawConfigForList(SortedStacks[jobName]);
+                    DrawConfigForList(SortedStacks[jobName.ToString()]);
 
                     ImGui.Unindent();
                 }
@@ -514,13 +501,15 @@ namespace MOAction
             {
                 if (ClientState.LocalPlayer != null)
                 {
-                    MoActionStack stack = new(null, null);
-                    stack.Job = ClientState.LocalPlayer.ClassJob.Id.ToString();
+                    MoActionStack stack = new(default, null);
+                    var job = ClientState.LocalPlayer.ClassJob.RowId.ToString();
+                    stack.Job = job;
                     NewStacks.Add(stack);
+                    PluginLog.Debug("localplayer job was {1}",job);
                 }
                 else
                 {
-                    NewStacks.Add(new(null, new()));
+                    NewStacks.Add(new(default, new()));
                 }
             }
             ImGui.End();
@@ -561,7 +550,7 @@ namespace MOAction
             foreach (var entry in configurationEntries)
             {
                 var action = applicableActions.FirstOrDefault(x => x.RowId == entry.BaseId);
-                if (action == default) continue;
+                if (action.RowId == default) continue;
                 string job = entry.Job;
                 List<StackEntry> entries = new();
                 foreach (var stackEntry in entry.Stack)
@@ -569,7 +558,7 @@ namespace MOAction
                     TargetType targ = TargetTypes.FirstOrDefault(x => x.TargetName == stackEntry.Item1);
                     if (targ == default) targ = GroundTargetTypes[0];
                     var action1 = applicableActions.FirstOrDefault(x => x.RowId == stackEntry.Item2);
-                    if (action1 == default)
+                    if (action1.RowId == default)
                         continue;
                     entries.Add(new(action1, targ));
                 }
@@ -594,7 +583,7 @@ namespace MOAction
 
         private void SortActions()
         {
-            List<Lumina.Excel.GeneratedSheets.Action> tmp = new();
+            List<Lumina.Excel.Sheets.Action> tmp = new();
 
             foreach (var x in JobAbbreviations)
             {
@@ -602,7 +591,7 @@ namespace MOAction
                 foreach (var action in applicableActions)
                 {
                     var nameStr = action.ClassJobCategory.Value.Name.ToString();
-                    if ((nameStr.Contains(elem) || nameStr.Contains(x.Abbreviation)) && !action.IsRoleAction)
+                    if ((nameStr.Contains(elem.ToString()) || nameStr.Contains(x.Abbreviation.ToString())) && !action.IsRoleAction)
                         tmp.Add(action);
                 }
             }
@@ -613,7 +602,7 @@ namespace MOAction
                 foreach (var action in applicableActions)
                 {
                     var nameStr = action.ClassJobCategory.Value.Name.ToString();
-                    if ((nameStr.Contains(elem) || nameStr.Contains(x.Abbreviation)) && action.IsRoleAction && !tmp.Contains(action))
+                    if ((nameStr.Contains(elem.ToString()) || nameStr.Contains(x.Abbreviation.ToString())) && action.IsRoleAction && !tmp.Contains(action))
                         tmp.Add(action);
                 }
             }
