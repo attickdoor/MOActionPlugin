@@ -13,13 +13,12 @@ using FFXIVClientStructs.FFXIV.Client.Game;
 using static MOAction.MOActionAddressResolver;
 using Dalamud;
 using Dalamud.Plugin.Services;
-using System.Reflection;
 
 namespace MOAction
 {
     public class MOAction
     {
-        private bool enableGroundTargetQueuePatch = false;
+        private bool enableGroundTargetQueuePatch = true;
         private readonly Dictionary<uint, Lumina.Excel.Sheets.ClassJob> JobDictionary;
         public delegate bool OnRequestActionDetour(long param_1, byte param_2, ulong param_3, ulong param_4,
                        uint param_5, uint param_6, uint param_7, long param_8);
@@ -154,7 +153,7 @@ namespace MOAction
             }
 
             ulong objectId = target == null ? 0xE0000000 : target.GameObjectId;
-            pluginLog.Verbose("Execution Action {action} with ActionID {actionid} on object with ObjectId {objectid}", action.Name, action.RowId, objectId);
+            pluginLog.Verbose("Execution Action {action} with ActionID {actionid} on object with ObjectId {objectid}", action.Name.ToString(), action.RowId, objectId);
 
             bool ret = requestActionHook.Original(param_1, actionType, action.RowId, objectId, param_5, param_6, param_7, param_8);
 
@@ -198,12 +197,12 @@ namespace MOAction
 
             if (stackToUse == null)
             {
-                pluginLog.Verbose("No action stack applicable for action: {action}", action.Name);
+                pluginLog.Verbose("No action stack applicable for action: {action}", action.Name.ToString());
                 return (default, null);
             }
             foreach (StackEntry entry in stackToUse.Entries)
             {
-                pluginLog.Verbose("unadjusted entry action, {rowid}, {name}", entry.Action.RowId, entry.Action.Name);
+                pluginLog.Verbose("unadjusted entry action, {rowid}, {name}", entry.Action.RowId, entry.Action.Name.ToString());
                 var (response, target) = CanUseAction(entry, ActionType);
                 if (response)
                 {
@@ -233,7 +232,7 @@ namespace MOAction
 
             // Check if ability is on CD or not (charges are fun!)
             bool abilityOnCoolDownResponse = actionManager->IsActionOffCooldown((ActionType)actionType, action.RowId);
-            pluginLog.Verbose("Is {ability} off cooldown? : {response}", action.Name, abilityOnCoolDownResponse);
+            pluginLog.Verbose("Is {ability} off cooldown? : {response}", action.Name.ToString(), abilityOnCoolDownResponse);
             if (!abilityOnCoolDownResponse)
             {
                 return (false, target);
@@ -251,18 +250,18 @@ namespace MOAction
                 else if (err != 0 && err != 565) return (false, target);
             }
 
-            pluginLog.Verbose("is {actionname} a role action?: {answer}", action.Name, action.IsRoleAction);
+            pluginLog.Verbose("is {actionname} a role action?: {answer}", action.Name.ToString(), action.IsRoleAction);
             if (!action.IsRoleAction)
             {
-                pluginLog.Verbose("is {actionName} usable at level: {level} available for player {playername} with {playerlevel}?", action.Name, action.ClassJobLevel, player.Name, player.Level);
+                pluginLog.Verbose("is {actionName} usable at level: {level} available for player {playername} with {playerlevel}?", action.Name.ToString(), action.ClassJobLevel, player.Name.ToString(), player.Level);
                 if (action.ClassJobLevel > clientState.LocalPlayer.Level) return (false, target);
             }
 
-            pluginLog.Verbose("is {actionname} a area spell/ability? {answer}", action.Name, action.TargetArea);
+            pluginLog.Verbose("is {actionname} a area spell/ability? {answer}", action.Name.ToString(), action.TargetArea);
             if (action.TargetArea) return (true, target);
 
             bool selfOnlyTargetAction = !action.CanTargetAlly && !action.CanTargetHostile && !action.CanTargetParty;
-            pluginLog.Verbose("Can {actionname} target: friendly - {friendly}, hostile  - {hostile}, party  - {party}, dead - {dead}, self - {self}", action.Name, action.CanTargetAlly, action.CanTargetHostile, action.CanTargetParty, (action.DeadTargetBehaviour==0), action.CanTargetSelf);
+            pluginLog.Verbose("Can {actionname} target: friendly - {friendly}, hostile  - {hostile}, party  - {party}, dead - {dead}, self - {self}", action.Name.ToString(), action.CanTargetAlly, action.CanTargetHostile, action.CanTargetParty, (action.DeadTargetBehaviour==0), action.CanTargetSelf);
             if (selfOnlyTargetAction)
             {
                 pluginLog.Verbose("Can only use this action on player, setting player as target");
@@ -270,7 +269,7 @@ namespace MOAction
             }
 
             bool gameCanUseActionResponse = ActionManager.CanUseActionOnTarget(action.RowId, (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)target.Address);
-            pluginLog.Verbose("can I use action: {rowid} with name {actionname} on target {targetid} with name {targetname} : {response}", action.RowId.ToString(), action.Name, target.DataId, target.Name, gameCanUseActionResponse);
+            pluginLog.Verbose("can I use action: {rowid} with name {actionname} on target {targetid} with name {targetname} : {response}", action.RowId.ToString(), action.Name.ToString(), target.DataId, target.Name.ToString(), gameCanUseActionResponse);
 
             return (gameCanUseActionResponse, target);
         }
