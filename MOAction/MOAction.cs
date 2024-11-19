@@ -19,7 +19,7 @@ namespace MOAction
     public class MOAction
     {
         private bool enableGroundTargetQueuePatch = true;
-        private readonly Dictionary<uint, Lumina.Excel.GeneratedSheets.ClassJob> JobDictionary;
+        private readonly Dictionary<uint, Lumina.Excel.Sheets.ClassJob> JobDictionary;
         public delegate bool OnRequestActionDetour(long param_1, byte param_2, ulong param_3, ulong param_4,
                        uint param_5, uint param_6, uint param_7, long param_8);
         [UnmanagedFunctionPointer(CallingConvention.ThisCall, CharSet = CharSet.Ansi)]
@@ -30,7 +30,7 @@ namespace MOAction
         public unsafe delegate RecastTimer* GetGroupTimerDelegate(void* @this, int cooldownGroup);
         private GetGroupTimerDelegate getGroupTimer;
         public List<MoActionStack> Stacks { get; set; }
-        private Lumina.Excel.ExcelSheet<Lumina.Excel.GeneratedSheets.Action> RawActions;
+        private Lumina.Excel.ExcelSheet<Lumina.Excel.Sheets.Action> RawActions;
         public IntPtr uiMoEntityId = IntPtr.Zero;
         public HashSet<ulong> enabledActions;
         public bool IsGuiMOEnabled = false;
@@ -55,10 +55,11 @@ namespace MOAction
                         IGameGui gamegui,
                         IGameInteropProvider hookprovider,
                         IPluginLog pluginLog,
-                        Dictionary<uint, Lumina.Excel.GeneratedSheets.ClassJob> JobDictionary
+                        Dictionary<uint, Lumina.Excel.Sheets.ClassJob> JobDictionary
                         )
         {
             Address = new(scanner, enableGroundTargetQueuePatch);
+            this.pluginLog = pluginLog;
             clientstate.Login += LoadClientModules;
             clientstate.Logout += ClearClientModules;
             if (clientstate.IsLoggedIn)
@@ -66,14 +67,14 @@ namespace MOAction
                 LoadClientModules();
             }
             dataManager = datamanager;
-            RawActions = dataManager.GetExcelSheet<Lumina.Excel.GeneratedSheets.Action>();
+            RawActions = dataManager.GetExcelSheet<Lumina.Excel.Sheets.Action>();
             targetManager = targetmanager;
             clientState = clientstate;
             objectTable = objects;
             keyState = keystate;
             gameGui = gamegui;
             this.hookprovider = hookprovider;
-            this.pluginLog = pluginLog;
+            
             this.JobDictionary = JobDictionary;
             Stacks = new();
             pluginLog.Info("===== M O A C T I O N =====");
@@ -91,7 +92,6 @@ namespace MOAction
             {
                 pronounModule = PronounModule.Instance();
                 actionManager = ActionManager.Instance();
-                getGroupTimer = Marshal.GetDelegateForFunctionPointer<GetGroupTimerDelegate>((IntPtr)ActionManager.Addresses.GetRecastGroupDetail.Value);
             }
             catch (Exception e)
             {
@@ -101,7 +101,7 @@ namespace MOAction
             }
         }
 
-        private unsafe void ClearClientModules()
+        private unsafe void ClearClientModules(int x, int y)
         {
             pronounModule = null;
             actionManager = null;
@@ -135,11 +135,6 @@ namespace MOAction
             }
         }
 
-        public unsafe RecastTimer* GetGroupRecastTimer(int group)
-        {
-            return group < 1 ? null : getGroupTimer(actionManager, group - 1);
-        }
-
         private unsafe bool HandleRequestAction(long param_1, byte actionType, ulong actionID, ulong target_ptr,
                        uint param_5, uint param_6, uint param_7, long param_8)
         {
@@ -152,13 +147,13 @@ namespace MOAction
 
             var (action, target) = GetActionTarget((uint)actionID, actionType);
 
-            if (action == null)
+            if (action.RowId == default)
             {
                 return requestActionHook.Original(param_1, actionType, actionID, target_ptr, param_5, param_6, param_7, param_8);
             }
 
             ulong objectId = target == null ? 0xE0000000 : target.GameObjectId;
-            pluginLog.Verbose("Execution Action {action} with ActionID {actionid} on object with ObjectId {objectid}", action.Name, action.RowId, objectId);
+            pluginLog.Verbose("Execution Action {action} with ActionID {actionid} on object with ObjectId {objectid}", action.Name.ToString(), action.RowId, objectId);
 
             bool ret = requestActionHook.Original(param_1, actionType, action.RowId, objectId, param_5, param_6, param_7, param_8);
 
@@ -171,19 +166,19 @@ namespace MOAction
             return ret;
         }
 
-        private unsafe (Lumina.Excel.GeneratedSheets.Action action, IGameObject target) GetActionTarget(uint ActionID, uint ActionType)
+        private unsafe (Lumina.Excel.Sheets.Action action, IGameObject target) GetActionTarget(uint ActionID, uint ActionType)
         {
             var action = RawActions.GetRow(ActionID);
 
             uint adjusted = actionManager->GetAdjustedActionId(ActionID);
 
-            if (action == null) return (null, null);
+            if (action.RowId == default) return (default, null);
 
             var applicableActions = Stacks.Where(entry => (entry.BaseAction.RowId == action.RowId ||
                                                           entry.BaseAction.RowId == adjusted ||
                                                           actionManager->GetAdjustedActionId(entry.BaseAction.RowId) == adjusted)
-                                                          && (clientState.LocalPlayer.ClassJob.Id == UInt32.Parse(entry.Job)
-                                                          || clientState.LocalPlayer.ClassJob.Id == JobDictionary[UInt32.Parse(entry.Job)].ClassJobParent.Row
+                                                          && (clientState.LocalPlayer.ClassJob.RowId == UInt32.Parse(entry.Job)
+                                                          || clientState.LocalPlayer.ClassJob.RowId == JobDictionary[UInt32.Parse(entry.Job)].ClassJobParent.RowId
                                                           ));
 
             MoActionStack stackToUse = null;
@@ -202,12 +197,12 @@ namespace MOAction
 
             if (stackToUse == null)
             {
-                pluginLog.Verbose("No action stack applicable for action: {action}", action.Name);
-                return (null, null);
+                pluginLog.Verbose("No action stack applicable for action: {action}", action.Name.ToString());
+                return (default, null);
             }
             foreach (StackEntry entry in stackToUse.Entries)
             {
-                pluginLog.Verbose("unadjusted entry action, {rowid}, {name}", entry.Action.RowId, entry.Action.Name);
+                pluginLog.Verbose("unadjusted entry action, {rowid}, {name}", entry.Action.RowId, entry.Action.Name.ToString());
                 var (response, target) = CanUseAction(entry, ActionType);
                 if (response)
                 {
@@ -216,16 +211,16 @@ namespace MOAction
 
             }
             pluginLog.Verbose("Chosen MoAction Entry stack did not have any usable actions.");
-            return (null, null);
+            return (default, null);
         }
 
         private unsafe (bool, IGameObject Target) CanUseAction(StackEntry targ, uint actionType)
         {
-            if (targ.Target == null || targ.Action == null) return (false, null);
+            if (targ.Target == null || targ.Action.RowId == default) return (false, null);
 
             var unadjustedAction = targ.Action;
             var action = RawActions.GetRow(actionManager->GetAdjustedActionId(targ.Action.RowId));
-            if (action == null) return (false, null); // just in case
+            if (action.RowId == default) return (false, null); // just in case
 
             var target = targ.Target.GetTarget();
             if (target == null)
@@ -237,7 +232,7 @@ namespace MOAction
 
             // Check if ability is on CD or not (charges are fun!)
             bool abilityOnCoolDownResponse = actionManager->IsActionOffCooldown((ActionType)actionType, action.RowId);
-            pluginLog.Verbose("Is {ability} off cooldown? : {response}", action.Name, abilityOnCoolDownResponse);
+            pluginLog.Verbose("Is {ability} off cooldown? : {response}", action.Name.ToString(), abilityOnCoolDownResponse);
             if (!abilityOnCoolDownResponse)
             {
                 return (false, target);
@@ -255,18 +250,18 @@ namespace MOAction
                 else if (err != 0 && err != 565) return (false, target);
             }
 
-            pluginLog.Verbose("is {actionname} a role action?: {answer}", action.Name, action.IsRoleAction);
+            pluginLog.Verbose("is {actionname} a role action?: {answer}", action.Name.ToString(), action.IsRoleAction);
             if (!action.IsRoleAction)
             {
-                pluginLog.Verbose("is {actionName} usable at level: {level} available for player {playername} with {playerlevel}?", action.Name, action.ClassJobLevel, player.Name, player.Level);
+                pluginLog.Verbose("is {actionName} usable at level: {level} available for player {playername} with {playerlevel}?", action.Name.ToString(), action.ClassJobLevel, player.Name.ToString(), player.Level);
                 if (action.ClassJobLevel > clientState.LocalPlayer.Level) return (false, target);
             }
 
-            pluginLog.Verbose("is {actionname} a area spell/ability? {answer}", action.Name, action.TargetArea);
+            pluginLog.Verbose("is {actionname} a area spell/ability? {answer}", action.Name.ToString(), action.TargetArea);
             if (action.TargetArea) return (true, target);
 
-            bool selfOnlyTargetAction = !action.CanTargetFriendly && !action.CanTargetHostile && !action.CanTargetParty;
-            pluginLog.Verbose("Can {actionname} target: friendly - {friendly}, hostile  - {hostile}, party  - {party}, dead - {dead}, self - {self}", action.Name, action.CanTargetFriendly, action.CanTargetHostile, action.CanTargetParty, action.CanTargetDead, action.CanTargetSelf);
+            bool selfOnlyTargetAction = !action.CanTargetAlly && !action.CanTargetHostile && !action.CanTargetParty;
+            pluginLog.Verbose("Can {actionname} target: friendly - {friendly}, hostile  - {hostile}, party  - {party}, dead - {dead}, self - {self}", action.Name.ToString(), action.CanTargetAlly, action.CanTargetHostile, action.CanTargetParty, (action.DeadTargetBehaviour==0), action.CanTargetSelf);
             if (selfOnlyTargetAction)
             {
                 pluginLog.Verbose("Can only use this action on player, setting player as target");
@@ -274,7 +269,7 @@ namespace MOAction
             }
 
             bool gameCanUseActionResponse = ActionManager.CanUseActionOnTarget(action.RowId, (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)target.Address);
-            pluginLog.Verbose("can I use action: {rowid} with name {actionname} on target {targetid} with name {targetname} : {response}", action.RowId.ToString(), action.Name, target.DataId, target.Name, gameCanUseActionResponse);
+            pluginLog.Verbose("can I use action: {rowid} with name {actionname} on target {targetid} with name {targetname} : {response}", action.RowId.ToString(), action.Name.ToString(), target.DataId, target.Name.ToString(), gameCanUseActionResponse);
 
             return (gameCanUseActionResponse, target);
         }
