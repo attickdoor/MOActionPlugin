@@ -43,7 +43,7 @@ namespace MOAction.Configuration
         public int CompareTo(MoActionStack other)
         {
             if (other == null) return 1;
-            return this.BaseAction.Name.ToString().CompareTo(other.BaseAction.Name.ToString());
+            return this.BaseAction.Name.ExtractText().CompareTo(other.BaseAction.Name.ExtractText());
         }
 
         public override int GetHashCode()
@@ -61,7 +61,7 @@ namespace MOAction.Configuration
         public string GetJob(IDataManager dm)
         {
             if (Job == "Unset Job") return Job;
-            return dm.GetExcelSheet<Lumina.Excel.Sheets.ClassJob>().First(x => x.RowId.ToString() == Job).Abbreviation.ToString();
+            return dm.GetExcelSheet<Lumina.Excel.Sheets.ClassJob>().First(x => x.RowId.ToString() == Job).Abbreviation.ExtractText();
         }
 
         public bool Equals(MoActionStack other)
