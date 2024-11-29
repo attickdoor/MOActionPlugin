@@ -9,7 +9,7 @@ namespace MOAction.Configuration
     public class MoActionStack : IEquatable<MoActionStack>, IComparable<MoActionStack>
     {
         public static VirtualKey[] AllKeys = { VirtualKey.NO_KEY, VirtualKey.SHIFT, VirtualKey.MENU, VirtualKey.CONTROL };
-        public Lumina.Excel.GeneratedSheets.Action BaseAction
+        public Lumina.Excel.Sheets.Action BaseAction
         {
             get; set;
         }
@@ -17,7 +17,7 @@ namespace MOAction.Configuration
         public string Job { get; set; }
         //public string ModifierName { get; set; }
         public VirtualKey Modifier { get; set; }
-        public MoActionStack(Lumina.Excel.GeneratedSheets.Action baseaction, List<StackEntry> list)
+        public MoActionStack(Lumina.Excel.Sheets.Action baseaction, List<StackEntry> list)
         {
             BaseAction = baseaction;
             if (list == null) Entries = new();
@@ -43,7 +43,7 @@ namespace MOAction.Configuration
         public int CompareTo(MoActionStack other)
         {
             if (other == null) return 1;
-            return this.BaseAction.Name.ToString().CompareTo(other.BaseAction.Name.ToString());
+            return this.BaseAction.Name.ExtractText().CompareTo(other.BaseAction.Name.ExtractText());
         }
 
         public override int GetHashCode()
@@ -61,7 +61,7 @@ namespace MOAction.Configuration
         public string GetJob(IDataManager dm)
         {
             if (Job == "Unset Job") return Job;
-            return dm.GetExcelSheet<Lumina.Excel.GeneratedSheets.ClassJob>().First(x => x.RowId.ToString() == Job).Abbreviation;
+            return dm.GetExcelSheet<Lumina.Excel.Sheets.ClassJob>().First(x => x.RowId.ToString() == Job).Abbreviation.ExtractText();
         }
 
         public bool Equals(MoActionStack other)

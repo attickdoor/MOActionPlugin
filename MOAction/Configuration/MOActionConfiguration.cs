@@ -1,11 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using Dalamud.Configuration;
-using Dalamud.Plugin;
 using MOAction.Configuration;
-using MOAction.Target;
-using Newtonsoft.Json;
 
 namespace MOAction
 {
