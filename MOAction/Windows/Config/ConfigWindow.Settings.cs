@@ -158,7 +158,7 @@ public partial class ConfigWindow
                 if (combo.Success)
                 {
                     foreach (var vk in MoActionStack.AllKeys)
-                        if (ImGui.Selectable(vk.ToString()))
+                        if (ImGui.Selectable(vk.ToString().Replace("MENU", "ALT")))
                             entry.Modifier = vk;
                 }
             }
