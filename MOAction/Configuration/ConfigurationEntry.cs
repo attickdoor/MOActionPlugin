@@ -2,25 +2,23 @@
 using System;
 using System.Collections.Generic;
 
+namespace MOAction.Configuration;
 
-namespace MOAction.Configuration
+[Serializable]
+public class ConfigurationEntry
 {
-    [Serializable]
-    public class ConfigurationEntry
+    public uint BaseId;
+
+    public List<(string, uint)> Stack;
+
+    public VirtualKey Modifier;
+    public string Job;
+
+    public ConfigurationEntry(uint baseId, List<(string, uint)> stack, VirtualKey modifier, string job)
     {
-        public uint BaseId;
-
-        public List<(string, uint)> Stack;
-
-        public VirtualKey Modifier;
-        public string Job;
-
-        public ConfigurationEntry(uint baseid, List<(string, uint)> stack, VirtualKey modifier, string job)
-        {
-            BaseId = baseid;
-            Stack = stack;
-            Modifier = modifier;
-            Job = job;
-        }
+        BaseId = baseId;
+        Stack = stack;
+        Modifier = modifier;
+        Job = job;
     }
 }

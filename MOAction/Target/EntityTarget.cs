@@ -1,25 +1,24 @@
 ﻿using Dalamud.Game.ClientState.Objects.Types;
 
-namespace MOAction.Target
-{
-    public class EntityTarget : TargetType
-    {
-        public EntityTarget(PtrFunc func, string name) : base(func, name) { }
-        public EntityTarget(PtrFunc func, string name, bool objneed) : base(func, name, objneed) { }
-        public override IGameObject GetTarget()
-        {
-            IGameObject obj = getPtr();
-            if (IsTargetValid())
-                return obj;
-                //return (uint)Marshal.ReadInt32(ptr + 0x74);
-            return null;
-        }
+namespace MOAction.Target;
 
-        public override bool IsTargetValid()
-        {
-            IGameObject obj = getPtr();
-            return obj != null;
-            //return (ptr != IntPtr.Zero || (int)ptr != 0);
-        }
+public class EntityTarget : TargetType
+{
+    public EntityTarget(PtrFunc func, string name) : base(func, name) { }
+    public EntityTarget(PtrFunc func, string name, bool objneed) : base(func, name, objneed) { }
+
+    public override IGameObject GetTarget()
+    {
+        var obj = GetPtr();
+        if (IsTargetValid())
+            return obj;
+
+        return null;
+    }
+
+    public override bool IsTargetValid()
+    {
+        var obj = GetPtr();
+        return obj != null;
     }
 }
