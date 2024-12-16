@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,7 +14,7 @@ namespace MOAction.Windows;
 
 public static class ExcelSheetSelector<T> where T : struct, IExcelRow<T>
 {
-    private static string LastJob;
+    private static string LastJob = string.Empty;
     private static T[]? FilteredSearchSheet;
 
     private static string SheetSearchText = null!;
@@ -22,7 +23,7 @@ public static class ExcelSheetSelector<T> where T : struct, IExcelRow<T>
 
     public record ExcelSheetOptions
     {
-        public Func<T, string> FormatRow { get; init; } = row => row.ToString();
+        public Func<T, string> FormatRow { get; init; } = row => row.ToString()!;
         public Func<T, string, bool>? SearchPredicate { get; init; } = null;
         public Func<T, bool, bool>? DrawSelectable { get; init; } = null;
         public IEnumerable<T>? FilteredSheet { get; init; }
@@ -31,7 +32,7 @@ public static class ExcelSheetSelector<T> where T : struct, IExcelRow<T>
 
     public record ExcelSheetComboOptions : ExcelSheetOptions
     {
-        public Func<T, string> GetPreview { get; init; } = null;
+        public Func<T, string>? GetPreview { get; init; } = null;
         public ImGuiComboFlags ComboFlags { get; init; } = ImGuiComboFlags.None;
     }
 
@@ -60,7 +61,7 @@ public static class ExcelSheetSelector<T> where T : struct, IExcelRow<T>
         FilteredSearchSheet ??= filteredSheet.Where(s => searchPredicate(s, SheetSearchText)).ToArray();
     }
 
-    public static bool ExcelSheetCombo(string id, ref uint selectedRow, string currentJob, ExcelSheetComboOptions options = null)
+    public static bool ExcelSheetCombo(string id, ref uint selectedRow, string currentJob, ExcelSheetComboOptions? options = null)
     {
         options ??= new ExcelSheetComboOptions();
         var sheet = Plugin.DataManager.GetExcelSheet<T>();

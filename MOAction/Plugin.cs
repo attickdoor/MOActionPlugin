@@ -57,10 +57,12 @@ public class Plugin : IDalamudPlugin
         });
         CommandManager.AddHandler("/moaction", new CommandInfo(OnCommandDebugMouseover)
         {
+            HelpMessage = "Alias for /pmoaction.",
             ShowInHelp = true
         });
         CommandManager.AddHandler("/mo", new CommandInfo(OnCommandDebugMouseover)
         {
+            HelpMessage = "Alias for /pmoaction.",
             ShowInHelp = true
         });
 
