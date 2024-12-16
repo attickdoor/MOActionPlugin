@@ -13,7 +13,6 @@ using Dalamud.Plugin.Services;
 using Dalamud.Game;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
-using Lumina.Extensions;
 using MOAction.Windows.Config;
 
 using Action = Lumina.Excel.Sheets.Action;
@@ -101,22 +100,13 @@ public class Plugin : IDalamudPlugin
         GroundTargetTypes = new EntityTarget(() => null, "Mouse Location", false);
 
         var config = PluginInterface.GetPluginConfig() as MOActionConfiguration ?? new MOActionConfiguration();
-        for (var i = 0; i < config.Stacks.Count; i++)
+        foreach (var entry in config.Stacks.ToArray())
         {
-            var y = config.Stacks[i];
-            if (uint.TryParse(y.Job, out _))
+            if (entry.JobIdx == 0)
                 continue;
 
-            var q = Sheets.ClassJobSheet.FirstOrNull(z => z.Abbreviation == y.Job);
-            if (q is { RowId: not 0 })
-            {
-                y.Job = Sheets.ClassJobSheet.First(z => z.Abbreviation == y.Job).RowId.ToString();
-            }
-            else
-            {
-                config.Stacks.Remove(y);
-                i--;
-            }
+            if (!Sheets.ClassJobSheet.TryGetRow(entry.JobIdx, out var row) || row.RowId == 0)
+                config.Stacks.Remove(entry);
         }
 
         Configuration = config;
@@ -192,7 +182,7 @@ public class Plugin : IDalamudPlugin
 
         Configuration.Stacks.Clear();
         foreach (var x in MoAction.Stacks)
-            Configuration.Stacks.Add(new ConfigurationEntry(x.BaseAction.RowId, x.Entries.Select(y => (y.Target.TargetName, y.Action.RowId)).ToList(), x.Modifier, x.ToJobString()));
+            Configuration.Stacks.Add(new ConfigurationEntry(x.BaseAction.RowId, x.Entries.Select(y => (y.Target.TargetName, y.Action.RowId)).ToList(), x.Modifier, x.Job));
 
         PluginInterface.SavePluginConfig(Configuration);
     }
@@ -223,7 +213,7 @@ public class Plugin : IDalamudPlugin
             if (action.RowId == 0)
                 continue;
 
-            var job = entry.Job != "Unset Job" ? uint.Parse(entry.Job) : uint.MaxValue;
+            var job = entry.JobIdx;
             List<StackEntry> entries = [];
             foreach (var stackEntry in entry.Stack)
             {
