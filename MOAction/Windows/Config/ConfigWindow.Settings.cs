@@ -27,6 +27,11 @@ public partial class ConfigWindow
             Dalamud.Utility.Util.OpenLink("https://youtu.be/pm4eCxD90gs");
 
         ImGui.Checkbox("Stack entry fails if target is out of range.", ref Plugin.Configuration.RangeCheck);
+        ImGui.TextUnformatted("MoAction Crosshair location (you'll have to draw it yourself with an overlay)");
+        ImGui.SetNextItemWidth(100);
+        ImGui.InputInt("X-coordinate",ref Plugin.Configuration.CrosshairWidth);
+        ImGui.SetNextItemWidth(100);
+        ImGui.InputInt("Y-coordinate",ref Plugin.Configuration.CrossHairHeight);
         if (ImGui.Button("Copy all stacks to clipboard"))
             Plugin.CopyToClipboard(Plugin.MoAction.Stacks);
 

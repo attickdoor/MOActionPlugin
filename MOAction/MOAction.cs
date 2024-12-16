@@ -7,6 +7,7 @@ using MOAction.Configuration;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using Dalamud;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
+using FFXIVClientStructs.FFXIV.Client.Game.Control;
 
 namespace MOAction;
 
@@ -196,5 +197,9 @@ public class MOAction
     public unsafe IGameObject GetActorFromPlaceholder(string placeholder)
     {
         return Plugin.Objects.CreateObjectReference((nint)PronounModule.Instance()->ResolvePlaceholder(placeholder, 1, 0));
+    }
+
+    public unsafe IGameObject GetActorFromCrosshairLocation(){
+       return Plugin.Objects.CreateObjectReference((nint)TargetSystem.Instance()->GetMouseOverObject(Plugin.Configuration.CrosshairWidth,Plugin.Configuration.CrosshairHeight));
     }
 }
