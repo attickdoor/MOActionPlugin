@@ -58,10 +58,10 @@ public partial class ConfigWindow
         // sorted stacks are grouped by job.
         using (ImRaii.PushId("Sorted Stacks"))
         {
-            foreach (var x in Plugin.JobAbbreviations)
+            foreach (var c in Plugin.JobAbbreviations)
             {
-                var jobName = x.Abbreviation.ExtractText();
-                var entries = Plugin.SavedStacks[jobName];
+                var jobName = c.Abbreviation.ExtractText();
+                var entries = Plugin.SavedStacks[c.RowId];
                 if (entries.Count == 0)
                     continue;
 
@@ -73,7 +73,7 @@ public partial class ConfigWindow
                         Plugin.CopyToClipboard(entries.ToList());
 
                     using var indent = ImRaii.PushIndent();
-                    DrawConfigForList(Plugin.SortedStacks[jobName]);
+                    DrawConfigForList(Plugin.SortedStacks[c.RowId]);
                 }
             }
         }
@@ -107,7 +107,8 @@ public partial class ConfigWindow
             if (Plugin.ClientState.LocalPlayer != null)
             {
                 MoActionStack stack = new(default, null);
-                var job = Plugin.ClientState.LocalPlayer.ClassJob.RowId.ToString();
+                var job = Plugin.ClientState.LocalPlayer.ClassJob.RowId;
+
                 stack.Job = job;
                 Plugin.NewStacks.Add(stack);
                 Plugin.PluginLog.Debug($"Localplayer job was {job}");
@@ -132,24 +133,24 @@ public partial class ConfigWindow
 
             // Require user to select a job, filtering actions down.
             ImGui.SetNextItemWidth(100);
-            using (var combo = ImRaii.Combo("Job", entry.GetJob()))
+            using (var combo = ImRaii.Combo("Job", entry.GetJobAbr()))
             {
                 if (combo.Success)
                 {
-                    foreach (var x in Plugin.JobAbbreviations)
+                    foreach (var c in Plugin.JobAbbreviations)
                     {
-                        var job = x.Abbreviation.ExtractText();
-                        if (!ImGui.Selectable(job))
+                        if (!ImGui.Selectable(c.Abbreviation.ExtractText()))
                             continue;
 
-                        if (entry.GetJob() != null && entry.GetJob() != job)
+                        var job = c.RowId;
+                        if (entry.Job != job)
                         {
                             entry.BaseAction = default;
                             foreach (var stackentry in entry.Entries)
                                 stackentry.Action = default;
                         }
 
-                        entry.Job = x.RowId.ToString();
+                        entry.Job = job;
                     }
                 }
             }
@@ -166,19 +167,19 @@ public partial class ConfigWindow
                 }
             }
 
-            if (entry.GetJob() != "Unset Job" || entry.GetJob() != "ADV")
+            if (entry.Job >= 1)
             {
                 using var indent = ImRaii.PushIndent();
                 ExcelSheetSelector<Lumina.Excel.Sheets.Action>.ExcelSheetComboOptions actionOptions = new()
                 {
                     FormatRow = a => a.RowId switch { _ => a.Name.ExtractText() },
-                    FilteredSheet = Plugin.JobActions[entry.GetJob()],
+                    FilteredSheet = Plugin.JobActions[entry.Job],
                 };
 
                 // Select base action.
                 ImGui.SetNextItemWidth(200);
                 var baseSelected = entry.BaseAction.RowId;
-                if (ExcelSheetSelector<Lumina.Excel.Sheets.Action>.ExcelSheetCombo("Base Action", ref baseSelected, entry.GetJob(), actionOptions))
+                if (ExcelSheetSelector<Lumina.Excel.Sheets.Action>.ExcelSheetCombo("Base Action", ref baseSelected, entry.Job, actionOptions))
                 {
                     var ability = Sheets.ActionSheet.GetRow(baseSelected);
 
@@ -218,7 +219,7 @@ public partial class ConfigWindow
                         ImGui.SameLine();
                         ImGui.SetNextItemWidth(200);
                         var selected = stackEntry.Action.RowId;
-                        if (ExcelSheetSelector<Lumina.Excel.Sheets.Action>.ExcelSheetCombo("Ability", ref selected, entry.GetJob(), actionOptions))
+                        if (ExcelSheetSelector<Lumina.Excel.Sheets.Action>.ExcelSheetCombo("Ability", ref selected, entry.Job, actionOptions))
                         {
                             var ability = Sheets.ActionSheet.GetRow(selected);
 
@@ -259,7 +260,7 @@ public partial class ConfigWindow
                 if (Helper.CtrlShiftButton("Delete Stack", "Hold Ctrl+Shift to delete the stack."))
                 {
                     list.Remove(entry);
-                    Plugin.SavedStacks[entry.GetJob()].Remove(entry);
+                    Plugin.SavedStacks[entry.Job].Remove(entry);
                     i--;
                 }
             }

@@ -92,7 +92,7 @@ public class MOAction
         var applicableActions = Stacks.Where(entry => (
             entry.BaseAction.RowId == action.RowId || entry.BaseAction.RowId == adjusted ||
             actionManager->GetAdjustedActionId(entry.BaseAction.RowId) == adjusted) &&
-            (Plugin.ClientState.LocalPlayer.ClassJob.RowId == uint.Parse(entry.Job) || Plugin.ClientState.LocalPlayer.ClassJob.RowId == Sheets.ClassJobSheet.GetRow(uint.Parse(entry.Job)).ClassJobParent.RowId));
+            (Plugin.ClientState.LocalPlayer.ClassJob.RowId == entry.Job || Plugin.ClientState.LocalPlayer.ClassJob.RowId == Sheets.ClassJobSheet.GetRow(entry.Job).ClassJobParent.RowId));
 
         MoActionStack stackToUse = null;
         foreach (var entry in applicableActions)

@@ -1,11 +1,17 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Lumina.Excel.Sheets;
 
 namespace MOAction;
 
 public static class Utils
 {
+    /// <summary> Gets the name and abbreviation of all jobs. </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
+    public static IEnumerable<(string Name, string Abr)> GetNames(this IEnumerable<ClassJob> list)
+        => list.Select(c => (c.Name.ExtractText(), c.Abbreviation.ExtractText()));
+
     /// <summary> Iterate over enumerables with additional index. </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
     public static IEnumerable<(T Value, int Index)> WithIndex<T>(this IEnumerable<T> list)
