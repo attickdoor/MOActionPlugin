@@ -24,3 +24,16 @@ public static class Utils
         (list[i], list[j]) = (list[j], list[i]);
     }
 }
+
+public class ActionComparer : IEqualityComparer<Action>
+{
+    bool IEqualityComparer<Action>.Equals(Action x, Action y)
+    {
+        return x.RowId == y.RowId;
+    }
+
+    int IEqualityComparer<Action>.GetHashCode(Action obj)
+    {
+        return obj.RowId.GetHashCode();
+    }
+}

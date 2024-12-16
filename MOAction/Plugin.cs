@@ -266,13 +266,14 @@ public class Plugin : IDalamudPlugin
 
     private void SortActions()
     {
-        List<Action> tmp = [];
+        // HashSet is to ensure actions are unique
+        var tmp = new HashSet<Action>(new ActionComparer());
         foreach (var (name, abr) in JobAbbreviations.GetNames())
         {
             foreach (var action in ApplicableActions)
             {
                 var nameStr = action.ClassJobCategory.Value.Name.ExtractText();
-                if ((nameStr.Contains(name) || nameStr.Contains(abr)) && tmp.All(a => a.RowId != action.RowId))
+                if (nameStr.Contains(name) || nameStr.Contains(abr))
                     tmp.Add(action);
             }
         }
