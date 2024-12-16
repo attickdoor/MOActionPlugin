@@ -12,3 +12,4 @@ Test 9: Have a stack of Cure 2 -> Cure 1, Duty support into Satasha and see Cure
 Test 10: Queue into Titan (Hard) and see if you're capable of casting damaging spells against the heart (irregular enemy type)  
 Test 11: Queue into Tam-tara Deepcroft (hard) and check if you're capable of casting Healing spells on Paiyo Raiyo  
 Test 12: Make a stack on AST Draw with non-self as a target, see if that still works  
+Test 13: Make a stack with the CrossHair to verify that the crosshair still works  

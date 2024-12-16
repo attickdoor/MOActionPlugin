@@ -84,6 +84,7 @@ public class Plugin : IDalamudPlugin
         [
             new EntityTarget(MoAction.GetGuiMoPtr, "UI Mouseover"),
             new EntityTarget(MoAction.GetFieldMo, "Field Mouseover"),
+            new EntityTarget(MoAction.GetActorFromCrossHairLocation,"Crosshair"),
             new EntityTarget(() => MoAction.GetActorFromPlaceholder("<t>"), "Target"),
             new EntityTarget(() => MoAction.GetActorFromPlaceholder("<f>"), "Focus Target"),
             new EntityTarget(() => MoAction.GetActorFromPlaceholder("<tt>"), "Target of Target"),
