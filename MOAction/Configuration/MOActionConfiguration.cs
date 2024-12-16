@@ -11,8 +11,7 @@ public class MOActionConfiguration : IPluginConfiguration
     public List<ConfigurationEntry> Stacks { get; private set; }
 
     public int CrosshairWidth;
-
-    public int CrossHairHeight;
+    public int CrosshairHeight;
 
     public bool RangeCheck;
 
@@ -20,12 +19,12 @@ public class MOActionConfiguration : IPluginConfiguration
     {
         Stacks = [];
         RangeCheck = false;
-        initializeCrossHairLocation();
+        InitializeCrosshairLocation();
     }
 
-    private unsafe void initializeCrossHairLocation(){
-        FFXIVClientStructs.FFXIV.Client.Graphics.Kernel.Device * dev = FFXIVClientStructs.FFXIV.Client.Graphics.Kernel.Device.Instance();
+    private unsafe void InitializeCrosshairLocation(){
+        var dev = FFXIVClientStructs.FFXIV.Client.Graphics.Kernel.Device.Instance();
         CrosshairWidth = (int)dev->Width/2;
-        CrossHairHeight = (int)dev->Height/2;
+        CrosshairHeight = (int)dev->Height/2;
     }
 }
