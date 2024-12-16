@@ -167,7 +167,7 @@ public partial class ConfigWindow
                 }
             }
 
-            if (entry.Job >= 1)
+            if (entry.Job is > 0 and < uint.MaxValue)
             {
                 using var indent = ImRaii.PushIndent();
                 ExcelSheetSelector<Lumina.Excel.Sheets.Action>.ExcelSheetComboOptions actionOptions = new()
