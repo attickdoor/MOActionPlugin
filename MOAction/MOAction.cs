@@ -166,7 +166,8 @@ public class MOAction
         }
 
         Plugin.PluginLog.Verbose($"Is {action.Name.ExtractText()} a area spell/ability? {action.TargetArea}");
-        if (action.TargetArea) return (true, target);
+        if (action.TargetArea)
+            return (true, target);
 
         var selfOnlyTargetAction = !action.CanTargetAlly && !action.CanTargetHostile && !action.CanTargetParty;
         Plugin.PluginLog.Verbose($"Can {action.Name.ExtractText()} target: friendly - {action.CanTargetAlly}, hostile  - {action.CanTargetHostile}, party  - {action.CanTargetParty}, dead - {action.DeadTargetBehaviour == 0}, self - {action.CanTargetSelf}");
