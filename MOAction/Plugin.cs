@@ -41,7 +41,7 @@ public class Plugin : IDalamudPlugin
     private List<Action> ApplicableActions;
 
     public readonly List<TargetType> TargetTypes;
-    public readonly List<TargetType> GroundTargetTypes;
+    public readonly TargetType GroundTargetTypes;
     public readonly List<MoActionStack> NewStacks = [];
     public readonly Dictionary<string, HashSet<MoActionStack>> SavedStacks = [];
     public readonly Dictionary<string, List<MoActionStack>> SortedStacks = [];
@@ -53,6 +53,14 @@ public class Plugin : IDalamudPlugin
         CommandManager.AddHandler("/pmoaction", new CommandInfo(OnCommandDebugMouseover)
         {
             HelpMessage = "Open a window to edit mouseover action settings.",
+            ShowInHelp = true
+        });
+        CommandManager.AddHandler("/moaction", new CommandInfo(OnCommandDebugMouseover)
+        {
+            ShowInHelp = true
+        });
+        CommandManager.AddHandler("/mo", new CommandInfo(OnCommandDebugMouseover)
+        {
             ShowInHelp = true
         });
 
@@ -84,7 +92,7 @@ public class Plugin : IDalamudPlugin
             new EntityTarget(() => MoAction.GetActorFromPlaceholder("<8>"), "<8>")
         ];
 
-        GroundTargetTypes = [new EntityTarget(() => null, "Mouse Location", false)];
+        GroundTargetTypes = new EntityTarget(() => null, "Mouse Location", false);
 
         var config = PluginInterface.GetPluginConfig() as MOActionConfiguration ?? new MOActionConfiguration();
         for (var i = 0; i < config.Stacks.Count; i++)
@@ -216,7 +224,7 @@ public class Plugin : IDalamudPlugin
             {
                 TargetType targ = TargetTypes.FirstOrDefault(x => x.TargetName == stackEntry.Item1);
                 if (targ == default)
-                    targ = GroundTargetTypes[0];
+                    targ = GroundTargetTypes;
 
                 var action1 = ApplicableActions.FirstOrDefault(x => x.RowId == stackEntry.Item2);
                 if (action1.RowId == 0)
@@ -239,6 +247,8 @@ public class Plugin : IDalamudPlugin
 
         MoAction.Dispose();
         CommandManager.RemoveHandler("/pmoaction");
+        CommandManager.RemoveHandler("/moaction");
+        CommandManager.RemoveHandler("/mo");
 
         WindowSystem.RemoveAllWindows();
         ConfigWindow.Dispose();

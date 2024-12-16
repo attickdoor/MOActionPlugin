@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Text;
+using Dalamud.Interface;
+using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MOAction.Configuration;
@@ -18,8 +20,8 @@ public partial class ConfigWindow
         if (!tabItem.Success)
             return 0;
 
-        ImGui.Text("This window allows you to set up your action stacks.");
-        ImGui.Text("What is an action stack? ");
+        ImGui.TextUnformatted("This window allows you to set up your action stacks.");
+        ImGui.TextUnformatted("What is an action stack? ");
         ImGui.SameLine();
         if (ImGui.Button("Click me to learn!"))
             Dalamud.Utility.Util.OpenLink("https://youtu.be/pm4eCxD90gs");
@@ -122,6 +124,7 @@ public partial class ConfigWindow
         for (var i = 0; i < list.Count; i++)
         {
             using var id = ImRaii.PushId(i);
+            var targetComboLength = ImGui.CalcTextSize("Target of Target   ").X + ImGui.GetFrameHeightWithSpacing();
 
             var entry = list.ElementAt(i);
             if (!ImGui.CollapsingHeader(entry.BaseAction.RowId == 0 ? "Unset Action###" : $"{entry.BaseAction.Name.ExtractText()}###"))
@@ -166,108 +169,98 @@ public partial class ConfigWindow
             if (entry.GetJob() != "Unset Job" || entry.GetJob() != "ADV")
             {
                 using var indent = ImRaii.PushIndent();
+                ExcelSheetSelector<Lumina.Excel.Sheets.Action>.ExcelSheetComboOptions actionOptions = new()
+                {
+                    FormatRow = a => a.RowId switch { _ => a.Name.ExtractText() },
+                    FilteredSheet = Plugin.JobActions[entry.GetJob()],
+                };
 
                 // Select base action.
                 ImGui.SetNextItemWidth(200);
-                using (var combo = ImRaii.Combo("Base Action", entry.BaseAction.RowId == 0 ? "" : entry.BaseAction.Name.ExtractText()))
+                var baseSelected = entry.BaseAction.RowId;
+                if (ExcelSheetSelector<Lumina.Excel.Sheets.Action>.ExcelSheetCombo("Base Action", ref baseSelected, entry.GetJob(), actionOptions))
                 {
-                    if (combo.Success)
-                    {
-                        foreach (var actionEntry in Plugin.JobActions[entry.GetJob()])
-                        {
-                            if (!ImGui.Selectable(actionEntry.Name.ExtractText()))
-                                continue;
+                    var ability = Sheets.ActionSheet.GetRow(baseSelected);
 
-                            // By default, add UI mouseover as the first TargetType
-                            entry.BaseAction = actionEntry;
-                            if (entry.Entries.Count == 0)
-                            {
-                                entry.Entries.Add(new StackEntry(actionEntry, Plugin.TargetTypes[0]));
-                            }
-                            else
-                            {
-                                entry.Entries[0].Action = actionEntry;
-                            }
-                        }
-                    }
+                    // By default, add UI mouseover as the first TargetType
+                    entry.BaseAction = ability;
+                    if (entry.Entries.Count == 0)
+                        entry.Entries.Add(new StackEntry(ability, Plugin.TargetTypes[0]));
+                    else
+                        entry.Entries[0].Action = ability;
                 }
 
-                if (entry.BaseAction.RowId != 0)
+                if (entry.BaseAction.RowId == 0)
+                    continue;
+
+                using (ImRaii.PushIndent())
                 {
-                    using (ImRaii.PushIndent())
+                    var deleteIdx = -1;
+                    var changedOrder = (OrgIdx: -1, NewIdx: -1);
+                    foreach (var (stackEntry, idx) in entry.Entries.WithIndex())
                     {
-                        for (int j = 0; j < entry.Entries.Count; j++)
+                        using var innerId = ImRaii.PushId(idx); // push stack entry number
+
+                        ImGui.AlignTextToFramePadding();
+                        ImGui.TextUnformatted($"#{entry.Entries.IndexOf(stackEntry) + 1}");
+                        ImGui.SameLine();
+                        ImGui.SetNextItemWidth(targetComboLength);
+                        using (var innerCombo = ImRaii.Combo("Target", stackEntry.Target == null ? "" : stackEntry.Target.TargetName))
                         {
-                            var stackEntry = entry.Entries[j];
-                            using var innerId = ImRaii.PushId(j); // push stack entry number
-
-                            ImGui.Text($"Ability #{entry.Entries.IndexOf(stackEntry) + 1}");
-                            ImGui.SetNextItemWidth(200);
-                            using (var innerCombo = ImRaii.Combo("Target", stackEntry.Target == null ? "" : stackEntry.Target.TargetName))
+                            if (innerCombo.Success)
                             {
-                                if (innerCombo.Success)
-                                {
-                                    foreach (var target in Plugin.TargetTypes)
-                                    {
-                                        if (ImGui.Selectable(target.TargetName))
-                                            stackEntry.Target = target;
-                                    }
-
-                                    if (stackEntry.Action.TargetArea)
-                                    {
-                                        foreach (var target in Plugin.GroundTargetTypes)
-                                            if (ImGui.Selectable(target.TargetName))
-                                                stackEntry.Target = target;
-                                    }
-                                }
-                            }
-
-                            ImGui.SameLine();
-                            ImGui.SetNextItemWidth(200);
-                            using (var innerCombo = ImRaii.Combo("Ability", stackEntry.Action.Name.ExtractText()))
-                            {
-                                if (innerCombo.Success)
-                                {
-                                    foreach (var ability in Plugin.JobActions[entry.GetJob()])
-                                    {
-                                        if (!ImGui.Selectable(ability.Name.ExtractText()))
-                                            continue;
-
-                                        stackEntry.Action = ability;
-                                        if (ability.TargetArea && Plugin.GroundTargetTypes.Contains(stackEntry.Target))
-                                            stackEntry.Target = null;
-                                    }
-                                }
-                            }
-
-                            // TODO: foreach makes lists immutable, use for-loop
-                            if (entry.Entries.Count > 1)
-                            {
-                                ImGui.SameLine();
-                                if (ImGui.Button("Delete Entry"))
-                                {
-                                    entry.Entries.Remove(stackEntry);
-                                    j--;
-                                }
+                                foreach (var target in stackEntry.Action.TargetArea ? Plugin.TargetTypes.Append(Plugin.GroundTargetTypes) : Plugin.TargetTypes)
+                                    if (ImGui.Selectable(target.TargetName))
+                                        stackEntry.Target = target;
                             }
                         }
+
+                        ImGui.SameLine();
+                        ImGui.SetNextItemWidth(200);
+                        var selected = stackEntry.Action.RowId;
+                        if (ExcelSheetSelector<Lumina.Excel.Sheets.Action>.ExcelSheetCombo("Ability", ref selected, entry.GetJob(), actionOptions))
+                        {
+                            var ability = Sheets.ActionSheet.GetRow(selected);
+
+                            stackEntry.Action = ability;
+                            if (ability.TargetArea && Plugin.GroundTargetTypes == stackEntry.Target)
+                                stackEntry.Target = null;
+                        }
+
+                        // Only show delete and reorder buttons if more than 1 entry
+                        if (entry.Entries.Count <= 1)
+                            continue;
+
+                        ImGui.SameLine();
+                        if (ImGuiComponents.IconButton(FontAwesomeIcon.Trash))
+                            deleteIdx = idx;
+
+                        var newIdx = idx;
+                        if (Helper.DrawArrows(ref newIdx, entry.Entries.Count))
+                            changedOrder = (idx, newIdx);
                     }
 
-                    // Add new entry to bottom of stack.
-                    if (ImGui.Button("Add new stack entry"))
-                        entry.Entries.Add(new StackEntry(entry.BaseAction, null));
+                    if (deleteIdx != -1)
+                        entry.Entries.RemoveAt(deleteIdx);
 
-                    ImGui.SameLine();
-                    if (ImGui.Button("Copy stack to clipboard"))
-                        Plugin.CopyToClipboard([entry]);
+                    if (changedOrder.OrgIdx != -1)
+                        entry.Entries.Swap(changedOrder.OrgIdx, changedOrder.NewIdx);
+                }
 
-                    ImGui.SameLine();
-                    if (ImGui.Button("Delete Stack"))
-                    {
-                        list.Remove(entry);
-                        Plugin.SavedStacks[entry.GetJob()].Remove(entry);
-                        i--;
-                    }
+                // Add new entry to bottom of stack.
+                if (ImGui.Button("Add new stack entry"))
+                    entry.Entries.Add(new StackEntry(entry.BaseAction, null));
+
+                ImGui.SameLine();
+                if (ImGui.Button("Copy stack to clipboard"))
+                    Plugin.CopyToClipboard([entry]);
+
+                ImGui.SameLine();
+                if (Helper.CtrlShiftButton("Delete Stack", "Hold Ctrl+Shift to delete the stack."))
+                {
+                    list.Remove(entry);
+                    Plugin.SavedStacks[entry.GetJob()].Remove(entry);
+                    i--;
                 }
             }
         }
