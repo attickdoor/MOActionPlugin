@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Numerics;
 using Dalamud.Configuration;
+using Dalamud.Interface.Colors;
 
 namespace MOAction.Configuration;
 
@@ -12,6 +14,12 @@ public class MOActionConfiguration : IPluginConfiguration
 
     public int CrosshairWidth;
     public int CrosshairHeight;
+    public bool DrawCrosshair = false;
+    public float CrosshairThickness = 5.0f;
+    public float CrosshairSize = 15.0f;
+    public Vector4 CrosshairInvalidColor = ImGuiColors.DalamudRed;
+    public Vector4 CrosshairValidColor = ImGuiColors.DalamudOrange;
+    public Vector4 CrosshairCastColor = ImGuiColors.ParsedGreen;
 
     public bool RangeCheck;
 

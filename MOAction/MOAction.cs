@@ -199,7 +199,8 @@ public class MOAction
         return Plugin.Objects.CreateObjectReference((nint)PronounModule.Instance()->ResolvePlaceholder(placeholder, 1, 0));
     }
 
-    public unsafe IGameObject GetActorFromCrosshairLocation(){
+    public unsafe IGameObject GetActorFromCrosshairLocation()
+    {
        return Plugin.Objects.CreateObjectReference((nint)TargetSystem.Instance()->GetMouseOverObject(Plugin.Configuration.CrosshairWidth,Plugin.Configuration.CrosshairHeight));
     }
 }

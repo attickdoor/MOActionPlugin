@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using Dalamud.Interface;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
@@ -31,7 +32,26 @@ public partial class ConfigWindow
         ImGui.SetNextItemWidth(100);
         ImGui.InputInt("X-coordinate",ref Plugin.Configuration.CrosshairWidth);
         ImGui.SetNextItemWidth(100);
-        ImGui.InputInt("Y-coordinate",ref Plugin.Configuration.CrossHairHeight);
+        ImGui.InputInt("Y-coordinate",ref Plugin.Configuration.CrosshairHeight);
+        ImGui.Checkbox("Enable Crosshair Draw", ref Plugin.Configuration.DrawCrosshair);
+        if (Plugin.Configuration.DrawCrosshair)
+        {
+            using var indent = ImRaii.PushIndent(10.0f);
+            ImGui.SetNextItemWidth(100);
+            ImGui.InputFloat("Size",ref Plugin.Configuration.CrosshairSize);
+            ImGui.SetNextItemWidth(100);
+            ImGui.InputFloat("Thickness",ref Plugin.Configuration.CrosshairThickness);
+
+            var spacing = ImGui.CalcTextSize("Target Acquired").X + (ImGui.GetFrameHeightWithSpacing() * 2);
+            Helper.ColorPickerWithReset("No Target", ref Plugin.Configuration.CrosshairInvalidColor, ImGuiColors.DalamudRed, spacing);
+            Helper.ColorPickerWithReset("Target Acquired", ref Plugin.Configuration.CrosshairValidColor, ImGuiColors.DalamudOrange, spacing);
+            Helper.ColorPickerWithReset("Target Locked", ref Plugin.Configuration.CrosshairCastColor, ImGuiColors.ParsedGreen, spacing);
+        }
+
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+
         if (ImGui.Button("Copy all stacks to clipboard"))
             Plugin.CopyToClipboard(Plugin.MoAction.Stacks);
 

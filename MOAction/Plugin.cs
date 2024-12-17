@@ -13,6 +13,7 @@ using Dalamud.Plugin.Services;
 using Dalamud.Game;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
+using MOAction.Windows;
 using MOAction.Windows.Config;
 
 using Action = Lumina.Excel.Sheets.Action;
@@ -138,6 +139,7 @@ public class Plugin : IDalamudPlugin
     private void Draw()
     {
         WindowSystem.Draw();
+        Helper.DrawCrosshair(this);
 
         if (!ConfigWindow.IsOpen && NewStacks.Count != 0)
             SortStacks();

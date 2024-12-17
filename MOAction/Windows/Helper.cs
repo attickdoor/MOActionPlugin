@@ -1,3 +1,4 @@
+using System.Numerics;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility.Raii;
@@ -61,5 +62,47 @@ public static class Helper
             Tooltip(tooltip);
 
         return ret;
+    }
+
+    public static bool ColorPickerWithReset(string name, ref Vector4 current, Vector4 reset, float spacing)
+    {
+        var changed = ImGui.ColorEdit4($"##{name}ColorPicker", ref current, ImGuiColorEditFlags.NoInputs);
+        ImGui.SameLine();
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted(name);
+        ImGui.SameLine(spacing);
+        if (ImGui.Button($"Reset##{name}Reset"))
+        {
+            current = reset;
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    public static void DrawCrosshair(Plugin plugin)
+    {
+        if (plugin.Configuration.DrawCrosshair)
+        {
+            if (Plugin.ClientState.LocalPlayer == null)
+                return;
+
+            var drawlist = ImGui.GetBackgroundDrawList();
+            var center = new Vector2(plugin.Configuration.CrosshairWidth, plugin.Configuration.CrosshairHeight);
+
+            var upper = center with { Y = center.Y - plugin.Configuration.CrosshairSize };
+            var lower = center with { Y = center.Y + plugin.Configuration.CrosshairSize };
+
+            var left = center with { X = center.X - plugin.Configuration.CrosshairSize };
+            var right = center with { X = center.X + plugin.Configuration.CrosshairSize };
+
+            var color = ImGui.ColorConvertFloat4ToU32(
+                Plugin.ClientState.LocalPlayer.IsCasting
+                    ? plugin.Configuration.CrosshairCastColor : plugin.MoAction.GetActorFromCrosshairLocation()?.IsValid() ?? false
+                        ? plugin.Configuration.CrosshairValidColor : plugin.Configuration.CrosshairInvalidColor);
+
+            drawlist.AddLine(upper, lower, color, plugin.Configuration.CrosshairThickness);
+            drawlist.AddLine(left, right, color, plugin.Configuration.CrosshairThickness);
+        }
     }
 }
