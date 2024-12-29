@@ -1,0 +1,133 @@
+[
+    {
+        "BaseId": 190,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 190
+            },
+            {
+                "Item1": "Target",
+                "Item2": 190
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 28
+    },
+    {
+        "BaseId": 173,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 173
+            },
+            {
+                "Item1": "Target",
+                "Item2": 173
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 28
+    },
+    {
+        "BaseId": 185,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 185
+            },
+            {
+                "Item1": "Target",
+                "Item2": 185
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 28
+    },
+    {
+        "BaseId": 189,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 189
+            },
+            {
+                "Item1": "Target",
+                "Item2": 189
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 28
+    },
+    {
+        "BaseId": 188,
+        "Stack": [
+            {
+                "Item1": "Target",
+                "Item2": 188
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 28
+    },
+    {
+        "BaseId": 3585,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 3585
+            },
+            {
+                "Item1": "Target",
+                "Item2": 3585
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 28
+    },
+    {
+        "BaseId": 7434,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 7434
+            },
+            {
+                "Item1": "Target",
+                "Item2": 7434
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 28
+    },
+    {
+        "BaseId": 7437,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 7437
+            },
+            {
+                "Item1": "Target",
+                "Item2": 7437
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 28
+    },
+    {
+        "BaseId": 25867,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 25867
+            },
+            {
+                "Item1": "Target",
+                "Item2": 25867
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 28
+    }
+]

@@ -1,0 +1,198 @@
+[
+    {
+        "BaseId": 7537,
+        "Stack": [
+            {
+                "Item1": "<2>",
+                "Item2": 7537
+            },
+            {
+                "Item1": "Target",
+                "Item2": 7537
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 32
+    },
+    {
+        "BaseId": 7393,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 7393
+            },
+            {
+                "Item1": "Target",
+                "Item2": 7393
+            },
+            {
+                "Item1": "<2>",
+                "Item2": 7393
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 32
+    },
+    {
+        "BaseId": 25754,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 25754
+            },
+            {
+                "Item1": "Target",
+                "Item2": 25754
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 32
+    },
+    {
+        "BaseId": 7537,
+        "Stack": [
+            {
+                "Item1": "<2>",
+                "Item2": 7537
+            },
+            {
+                "Item1": "Target",
+                "Item2": 7537
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 32
+    },
+    {
+        "BaseId": 25758,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 25758
+            },
+            {
+                "Item1": "Target",
+                "Item2": 25758
+            },
+            {
+                "Item1": "<2>",
+                "Item2": 25758
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 37
+    },
+    {
+        "BaseId": 16151,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 16151
+            },
+            {
+                "Item1": "Target",
+                "Item2": 16151
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 37
+    },
+    {
+        "BaseId": 7537,
+        "Stack": [
+            {
+                "Item1": "<2>",
+                "Item2": 7537
+            },
+            {
+                "Item1": "Target",
+                "Item2": 7537
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 32
+    },
+    {
+        "BaseId": 3541,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 3541
+            },
+            {
+                "Item1": "Target",
+                "Item2": 3541
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 19
+    },
+    {
+        "BaseId": 7382,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 7382
+            },
+            {
+                "Item1": "Target",
+                "Item2": 7382
+            },
+            {
+                "Item1": "<2>",
+                "Item2": 7382
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 19
+    },
+    {
+        "BaseId": 27,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 27
+            },
+            {
+                "Item1": "Target",
+                "Item2": 27
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 19
+    },
+    {
+        "BaseId": 7537,
+        "Stack": [
+            {
+                "Item1": "<2>",
+                "Item2": 7537
+            },
+            {
+                "Item1": "Target",
+                "Item2": 7537
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 32
+    },
+    {
+        "BaseId": 16464,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 16464
+            },
+            {
+                "Item1": "Target",
+                "Item2": 16464
+            },
+            {
+                "Item1": "<2>",
+                "Item2": 16464
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 21
+    }
+]

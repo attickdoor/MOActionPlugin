@@ -58,22 +58,7 @@ public partial class ConfigWindow
         ImGui.SameLine();
         if (ImGui.Button("Import stacks from clipboard"))
         {
-            // TODO: don't wipe all existing stacks
-            try
-            {
-                var tempStacks = Plugin.SortStacks(Plugin.RebuildStacks(JsonConvert.DeserializeObject<List<ConfigurationEntry>>(Encoding.UTF8.GetString(Convert.FromBase64String(ImGui.GetClipboardText())))));
-                foreach (var (k, v) in tempStacks)
-                {
-                    if (Plugin.SavedStacks.TryGetValue(k, out var value))
-                        value.UnionWith(v);
-                    else
-                        Plugin.SavedStacks[k] = v;
-                }
-            }
-            catch (Exception e)
-            {
-                Plugin.PluginLog.Error(e, "Importing stacks from clipboard failed.");
-            }
+            ImportStringToMouseOverActions(ImGui.GetClipboardText());
         }
 
         using var child = ImRaii.Child("scrolling", Vector2.Zero, true);

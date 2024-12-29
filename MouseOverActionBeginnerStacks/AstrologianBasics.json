@@ -1,0 +1,178 @@
+[
+    {
+        "BaseId": 3594,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 3594
+            },
+            {
+                "Item1": "Target",
+                "Item2": 3594
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 33
+    },
+    {
+        "BaseId": 3603,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 3603
+            },
+            {
+                "Item1": "Target",
+                "Item2": 3603
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 33
+    },
+    {
+        "BaseId": 3610,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 3610
+            },
+            {
+                "Item1": "Target",
+                "Item2": 3610
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 33
+    },
+    {
+        "BaseId": 3595,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 3595
+            },
+            {
+                "Item1": "Target",
+                "Item2": 3595
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 33
+    },
+    {
+        "BaseId": 3614,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 3614
+            },
+            {
+                "Item1": "Target",
+                "Item2": 3614
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 33
+    },
+    {
+        "BaseId": 37019,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 37019
+            },
+            {
+                "Item1": "Target",
+                "Item2": 37019
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 33
+    },
+    {
+        "BaseId": 37020,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 37020
+            },
+            {
+                "Item1": "Target",
+                "Item2": 37020
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 33
+    },
+    {
+        "BaseId": 37021,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 37021
+            },
+            {
+                "Item1": "Target",
+                "Item2": 37021
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 33
+    },
+    {
+        "BaseId": 3612,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 3612
+            },
+            {
+                "Item1": "Target",
+                "Item2": 3612
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 33
+    },
+    {
+        "BaseId": 7439,
+        "Stack": [
+            {
+                "Item1": "Target",
+                "Item2": 7439
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 33
+    },
+    {
+        "BaseId": 16556,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 16556
+            },
+            {
+                "Item1": "Target",
+                "Item2": 16556
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 33
+    },
+    {
+        "BaseId": 25873,
+        "Stack": [
+            {
+                "Item1": "UI Mouseover",
+                "Item2": 25873
+            },
+            {
+                "Item1": "Target",
+                "Item2": 25873
+            }
+        ],
+        "Modifier": 0,
+        "JobIdx": 33
+    }
+]

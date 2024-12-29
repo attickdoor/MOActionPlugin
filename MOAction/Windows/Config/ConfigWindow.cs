@@ -4,6 +4,10 @@ using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using FFXIVClientStructs.FFXIV.Common.Math;
 using ImGuiNET;
+using System.Collections.Generic;
+using System.Text;
+using MOAction.Configuration;
+using Newtonsoft.Json;
 
 namespace MOAction.Windows.Config;
 
@@ -42,6 +46,8 @@ public partial class ConfigWindow : Window, IDisposable
                     open = Math.Max(Settings(), open);
 
                     open = Math.Max(About(), open);
+
+                    open = Math.Max(Wizard(), open);
                 }
             }
         }
@@ -61,6 +67,25 @@ public partial class ConfigWindow : Window, IDisposable
             case 2:
                 DrawAboutButtons();
                 break;
+        }
+    }
+
+        private void ImportStringToMouseOverActions(String import)
+    {
+        try
+        {
+            var tempStacks = Plugin.SortStacks(Plugin.RebuildStacks(JsonConvert.DeserializeObject<List<ConfigurationEntry>>(Encoding.UTF8.GetString(Convert.FromBase64String(import)))));
+            foreach (var (k, v) in tempStacks)
+            {
+                if (Plugin.SavedStacks.TryGetValue(k, out var value))
+                    value.UnionWith(v);
+                else
+                    Plugin.SavedStacks[k] = v;
+            }
+        }
+        catch (Exception e)
+        {
+            Plugin.PluginLog.Error(e, "Importing stacks from clipboard failed.");
         }
     }
 }
