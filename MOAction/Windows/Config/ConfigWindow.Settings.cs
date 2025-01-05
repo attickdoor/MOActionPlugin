@@ -15,11 +15,11 @@ namespace MOAction.Windows.Config;
 
 public partial class ConfigWindow
 {
-    private int Settings()
+    private Tabs Settings()
     {
         using var tabItem = ImRaii.TabItem("Settings");
         if (!tabItem.Success)
-            return 0;
+            return Tabs.None;
 
         ImGui.TextUnformatted("This window allows you to set up your action stacks.");
         ImGui.TextUnformatted("What is an action stack? ");
@@ -78,7 +78,7 @@ public partial class ConfigWindow
 
         using var child = ImRaii.Child("scrolling", Vector2.Zero, true);
         if (!child.Success)
-            return 1;
+            return Tabs.Settings;
 
         // sorted stacks are grouped by job.
         using (ImRaii.PushId("Sorted Stacks"))
@@ -109,7 +109,7 @@ public partial class ConfigWindow
             DrawConfigForList(Plugin.NewStacks);
         }
 
-        return 1;
+        return Tabs.Settings;
     }
 
     private void DrawSettingsButtons()

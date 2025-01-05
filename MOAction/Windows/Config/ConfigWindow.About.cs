@@ -8,11 +8,11 @@ namespace MOAction.Windows.Config;
 
 public partial class ConfigWindow
 {
-    private static int About()
+    private static Tabs About()
     {
         using var tabItem = ImRaii.TabItem("About");
         if (!tabItem.Success)
-            return 0;
+            return Tabs.None;
 
         ImGuiHelpers.ScaledDummy(5.0f);
 
@@ -28,7 +28,7 @@ public partial class ConfigWindow
         ImGui.SameLine();
         ImGui.TextColored(ImGuiColors.ParsedOrange, Plugin.PluginInterface.Manifest.AssemblyVersion.ToString());
 
-        return 2;
+        return Tabs.About;
     }
 
     private void DrawAboutButtons()
