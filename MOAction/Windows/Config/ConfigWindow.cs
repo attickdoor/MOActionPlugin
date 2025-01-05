@@ -88,14 +88,14 @@ public partial class ConfigWindow : Window, IDisposable
             var tempStacks = Plugin.SortStacks(Plugin.RebuildStacks(JsonConvert.DeserializeObject<List<ConfigurationEntry>>(Encoding.UTF8.GetString(Convert.FromBase64String(import)))));
             //TODO maybe write those 2 information pluginlogs to the chatlog as dalamud informational text?
             Plugin.PluginLog.Information("Imported stacks on base actions will never overwrite existing stacks and are thus not imported.");
-            Plugin.Ichatgui.Print("Imported stacks on base actions will never overwrite existing stacks and are thus not imported.","MoAction",0x1F);
+            Plugin.Ichatgui.Print("Imported stacks on base actions will never overwrite existing stacks and are thus not imported.", "MoAction", 0x1F);
             foreach (var (classjob, v) in tempStacks)
             {
                 //no need to import if there's nothing to import for that specific classjob
                 if (v.Count > 0)
                 {
                     Plugin.PluginLog.Information("importing: {import}", v);
-                    Plugin.Ichatgui.Print("importing:\n" + string.Join("\n",v.Select(entry =>$"[{entry}]")), "MoAction",0x1F);
+                    Plugin.Ichatgui.Print("importing for " + Sheets.ClassJobSheet.GetRow(classjob).Abbreviation.ExtractText() + ":\n" + string.Join("\n", v.Select(entry => $"[{entry}]")));
                     if (Plugin.SavedStacks.TryGetValue(classjob, out var value))
                     {
                         //TODO: union currently ignores new stacks of baseactions already configured with any stack and does not do a deeper union on the lists within the stack

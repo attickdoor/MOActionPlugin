@@ -15,6 +15,6 @@ public class StackEntry
 
     public override string ToString()
     {
-        return Action.Name.ExtractText()+", "+Target.ToString();
+        return Action.Name.ExtractText()+"@"+Target.ToString();
     }
 }
