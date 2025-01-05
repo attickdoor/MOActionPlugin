@@ -87,8 +87,8 @@ public partial class ConfigWindow : Window, IDisposable
         {
             var tempStacks = Plugin.SortStacks(Plugin.RebuildStacks(JsonConvert.DeserializeObject<List<ConfigurationEntry>>(Encoding.UTF8.GetString(Convert.FromBase64String(import)))));
             //TODO maybe write those 2 information pluginlogs to the chatlog as dalamud informational text?
-            Plugin.PluginLog.Information("Any existing stacks on imported base actions take precedence and will not be imported.");
-            Plugin.Ichatgui.Print("Any existing stacks on imported base actions take precedence and will not be imported.","MoAction",0x1F);
+            Plugin.PluginLog.Information("Imported stacks on base actions will never overwrite existing stacks and are thus not imported.");
+            Plugin.Ichatgui.Print("Imported stacks on base actions will never overwrite existing stacks and are thus not imported.","MoAction",0x1F);
             foreach (var (classjob, v) in tempStacks)
             {
                 //no need to import if there's nothing to import for that specific classjob
