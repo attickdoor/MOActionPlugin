@@ -11,6 +11,18 @@ using Newtonsoft.Json;
 
 namespace MOAction.Windows.Config;
 
+[Flags]
+public enum Tabs
+{
+    None,
+
+    Settings,
+
+    About,
+
+    Wizard,
+}
+
 public partial class ConfigWindow : Window, IDisposable
 {
     private readonly Plugin Plugin;
@@ -33,8 +45,7 @@ public partial class ConfigWindow : Window, IDisposable
 
     public override void Draw()
     {
-        // TODO Find better solution to draw bottom bar depend on open tab
-        var open = 0;
+        var open = Tabs.None;
         var bottomContentHeight = ImGui.GetFrameHeightWithSpacing() + ImGui.GetStyle().WindowPadding.Y + GetSeparatorPaddingHeight;
         using (var contentChild = ImRaii.Child("ConfigContent", new Vector2(0, -bottomContentHeight)))
         {
@@ -43,11 +54,11 @@ public partial class ConfigWindow : Window, IDisposable
                 using var tabBar = ImRaii.TabBar("##ConfigTabBar");
                 if (tabBar.Success)
                 {
-                    open = Math.Max(Settings(), open);
+                    open |= Settings();
 
-                    open = Math.Max(About(), open);
+                    open |= About();
 
-                    open = Math.Max(Wizard(), open);
+                    open |= Wizard();
                 }
             }
         }
@@ -61,10 +72,10 @@ public partial class ConfigWindow : Window, IDisposable
 
         switch (open)
         {
-            case 1:
+            case Tabs.Settings:
                 DrawSettingsButtons();
                 break;
-            case 2:
+            case Tabs.About:
                 DrawAboutButtons();
                 break;
         }
