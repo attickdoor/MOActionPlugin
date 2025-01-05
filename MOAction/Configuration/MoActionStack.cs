@@ -89,6 +89,6 @@ public class MoActionStack : IEquatable<MoActionStack>, IComparable<MoActionStac
     }
 
     public override string ToString(){
-        return"BaseAction "+ BaseAction.Name.ExtractText() + string.Join(", ", Entries.Select(entry => entry.ToString()));
+        return"BaseAction: "+ BaseAction.Name.ExtractText() + " - Stack: " + string.Join(", ", Entries.Select(entry => $"[{entry}]"));
     }
 }

@@ -32,6 +32,8 @@ public class Plugin : IDalamudPlugin
     [PluginService] internal static IGameInteropProvider HookProvider { get; private set; } = null!;
     [PluginService] internal static IObjectTable Objects { get; private set; } = null!;
     [PluginService] internal static IKeyState KeyState { get; private set; } = null!;
+    [PluginService] internal static IChatGui Ichatgui { get; private set; } = null!;
+
 
     public MOActionConfiguration Configuration;
 
