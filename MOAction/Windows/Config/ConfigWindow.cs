@@ -14,13 +14,10 @@ namespace MOAction.Windows.Config;
 [Flags]
 public enum Tabs
 {
-    None,
-
-    Settings,
-
-    About,
-
-    Wizard,
+    None = 0,
+    Settings = 1,
+    Wizard = 2,
+    About = 3
 }
 
 public partial class ConfigWindow : Window, IDisposable
@@ -56,9 +53,9 @@ public partial class ConfigWindow : Window, IDisposable
                 {
                     open |= Settings();
 
-                    open |= About();
-
                     open |= Wizard();
+
+                    open |= About();
                 }
             }
         }
@@ -86,25 +83,31 @@ public partial class ConfigWindow : Window, IDisposable
         try
         {
             var tempStacks = Plugin.SortStacks(Plugin.RebuildStacks(JsonConvert.DeserializeObject<List<ConfigurationEntry>>(Encoding.UTF8.GetString(Convert.FromBase64String(import)))));
+            //TODO maybe write those 2 information pluginlogs to the chatlog as dalamud informational text?
+            Plugin.PluginLog.Information("Any existing stacks on imported base actions take precedence and will not be imported.");
             foreach (var (classjob, v) in tempStacks)
             {
-                if (Plugin.SavedStacks.TryGetValue(classjob, out var value))
+                //no need to import if there's nothing to import for that specific classjob
+                if (v.Count > 0)
                 {
-                    //TODO: union currently ignores new stacks of baseactions already configured with any stack and does not do a deeper union on the lists within the stack
-                    Plugin.PluginLog.Verbose("old: {old}",value);
-                    Plugin.PluginLog.Verbose("imported: {imported}",v);
-                    value.UnionWith(v);
-                    Plugin.PluginLog.Verbose("union: {union}",value);
-                }
-                else
-                {
-                    Plugin.SavedStacks[classjob] = v;
+                    Plugin.PluginLog.Information("importing: {import}", v);
+                    if (Plugin.SavedStacks.TryGetValue(classjob, out var value))
+                    {
+                        //TODO: union currently ignores new stacks of baseactions already configured with any stack and does not do a deeper union on the lists within the stack
+                        Plugin.PluginLog.Verbose("old: {old}", value);
+                        value.UnionWith(v);
+                        Plugin.PluginLog.Verbose("union: {union}", value);
+                    }
+                    else
+                    {
+                        Plugin.SavedStacks[classjob] = v;
+                    }
                 }
             }
         }
         catch (Exception e)
         {
-            Plugin.PluginLog.Error(e, "Importing stacks from clipboard failed.");
+            Plugin.PluginLog.Error(e, "Importing stacks failed.");
         }
     }
 }

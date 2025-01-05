@@ -11,11 +11,11 @@ public partial class ConfigWindow
 {
 
     private static string DirectoryName = "beginner";
-    private int Wizard()
+    private Tabs Wizard()
     {
         using var tabItem = ImRaii.TabItem("Wizard");
         if (!tabItem.Success)
-            return 0;
+            return Tabs.None;
 
         ImGui.TextUnformatted("This window has some beginner friendly stacks for you to import.");
         if (ImGui.Button("Import Gapcloser basics"))
@@ -48,7 +48,7 @@ public partial class ConfigWindow
             ImportStringToMouseOverActions(Convert.ToBase64String(Encoding.UTF8.GetBytes(File.ReadAllText(Path.Combine(Plugin.PluginInterface.AssemblyLocation.DirectoryName!,DirectoryName,"SGE.json")))));
              Plugin.SaveStacks();
         }
-        return 3;
+        return Tabs.Wizard;
     }
 
 }
