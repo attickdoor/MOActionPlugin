@@ -70,17 +70,25 @@ public partial class ConfigWindow : Window, IDisposable
         }
     }
 
-        private void ImportStringToMouseOverActions(String import)
+    private void ImportStringToMouseOverActions(String import)
     {
         try
         {
             var tempStacks = Plugin.SortStacks(Plugin.RebuildStacks(JsonConvert.DeserializeObject<List<ConfigurationEntry>>(Encoding.UTF8.GetString(Convert.FromBase64String(import)))));
-            foreach (var (k, v) in tempStacks)
+            foreach (var (classjob, v) in tempStacks)
             {
-                if (Plugin.SavedStacks.TryGetValue(k, out var value))
+                if (Plugin.SavedStacks.TryGetValue(classjob, out var value))
+                {
+                    //TODO: union currently ignores new stacks of baseactions already configured with any stack and does not do a deeper union on the lists within the stack
+                    Plugin.PluginLog.Verbose("old: {old}",value);
+                    Plugin.PluginLog.Verbose("imported: {imported}",v);
                     value.UnionWith(v);
+                    Plugin.PluginLog.Verbose("union: {union}",value);
+                }
                 else
-                    Plugin.SavedStacks[k] = v;
+                {
+                    Plugin.SavedStacks[classjob] = v;
+                }
             }
         }
         catch (Exception e)

@@ -12,4 +12,9 @@ public class StackEntry
         Action = action;
         Target = targ;
     }
+
+    public override string ToString()
+    {
+        return "["+Action.Name.ExtractText()+", "+Target.ToString()+"]";
+    }
 }
