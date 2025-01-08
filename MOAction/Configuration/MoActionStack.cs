@@ -88,7 +88,5 @@ public class MoActionStack : IEquatable<MoActionStack>, IComparable<MoActionStac
         return Job == uint.MaxValue ? "Unset Job" : Job.ToString();
     }
 
-    public override string ToString(){
-        return BaseAction.Name.ExtractText() + " - " + string.Join(", ", Entries.Select(entry => $"[{entry}]"));
-    }
+    public override string ToString() => $"{BaseAction.Name.ExtractText()} - {string.Join(", ",Entries.Select(entry => $"[{entry}]"))}";
 }
