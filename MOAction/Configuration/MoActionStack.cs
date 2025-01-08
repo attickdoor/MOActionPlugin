@@ -44,6 +44,7 @@ public class MoActionStack : IEquatable<MoActionStack>, IComparable<MoActionStac
         return true;
     }
 
+    //TODO make the overwritten equals and hashcodes a bit more smart, to not ignore the deeper stackentry list
     public int CompareTo(MoActionStack other)
     {
         if (other == null)
@@ -52,11 +53,13 @@ public class MoActionStack : IEquatable<MoActionStack>, IComparable<MoActionStac
         return string.Compare(BaseAction.Name.ExtractText(), other.BaseAction.Name.ExtractText(), StringComparison.Ordinal);
     }
 
+    //TODO make the overwritten equals and hashcodes a bit more smart, to not ignore the deeper stackentry list
     public override int GetHashCode()
     {
         return (int)(BaseAction.RowId + Job.GetHashCode() + (int)Modifier);
     }
 
+    //TODO make the overwritten equals and hashcodes a bit more smart, to not ignore the deeper stackentry list
     public override bool Equals(object obj)
     {
         if (obj == null || obj.GetType() != GetType())
@@ -64,6 +67,15 @@ public class MoActionStack : IEquatable<MoActionStack>, IComparable<MoActionStac
 
         var x = (MoActionStack)obj;
         return BaseAction.RowId == x.BaseAction.RowId && Job == x.Job;
+    }
+
+    //TODO make the overwritten equals and hashcodes a bit more smart, to not ignore the deeper stackentry list
+     public bool Equals(MoActionStack other)
+    {
+        if (other == null)
+            return false;
+
+        return GetHashCode() == other.GetHashCode();
     }
 
     public string GetJobAbr()
@@ -76,11 +88,5 @@ public class MoActionStack : IEquatable<MoActionStack>, IComparable<MoActionStac
         return Job == uint.MaxValue ? "Unset Job" : Job.ToString();
     }
 
-    public bool Equals(MoActionStack other)
-    {
-        if (other == null)
-            return false;
-
-        return GetHashCode() == other.GetHashCode();
-    }
+    public override string ToString() => $"{BaseAction.Name.ExtractText()} - {string.Join(", ",Entries.Select(entry => $"[{entry}]"))}";
 }

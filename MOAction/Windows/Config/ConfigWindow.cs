@@ -4,17 +4,23 @@ using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using FFXIVClientStructs.FFXIV.Common.Math;
 using ImGuiNET;
+using System.Collections.Generic;
+using System.Text;
+using MOAction.Configuration;
+using Newtonsoft.Json;
+using Dalamud.Plugin.Services;
+using System.Linq;
+using Dalamud.Interface.Style;
 
 namespace MOAction.Windows.Config;
 
 [Flags]
 public enum Tabs
 {
-    None,
-
-    Settings,
-
-    About,
+    None = 0,
+    Settings = 1,
+    Wizard = 2,
+    About = 3
 }
 
 public partial class ConfigWindow : Window, IDisposable
@@ -50,6 +56,8 @@ public partial class ConfigWindow : Window, IDisposable
                 {
                     open |= Settings();
 
+                    open |= Wizard();
+
                     open |= About();
                 }
             }
@@ -70,6 +78,41 @@ public partial class ConfigWindow : Window, IDisposable
             case Tabs.About:
                 DrawAboutButtons();
                 break;
+        }
+    }
+
+    private void ImportStringToMouseOverActions(String import)
+    {
+        try
+        {
+            var tempStacks = Plugin.SortStacks(Plugin.RebuildStacks(JsonConvert.DeserializeObject<List<ConfigurationEntry>>(Encoding.UTF8.GetString(Convert.FromBase64String(import)))));
+            //TODO maybe write those 2 information pluginlogs to the chatlog as dalamud informational text?
+            Plugin.PluginLog.Information("Imported stacks on base actions will never overwrite existing stacks and are thus not imported.");
+            Plugin.Ichatgui.Print("Imported stacks on base actions will never overwrite existing stacks and are thus not imported.", "MoAction", 0x1F);
+            foreach (var (classjob, v) in tempStacks)
+            {
+                //no need to import if there's nothing to import for that specific classjob
+                if (v.Count > 0)
+                {
+                    Plugin.PluginLog.Information("importing: {import}", v);
+                    Plugin.Ichatgui.Print("importing for " + Sheets.ClassJobSheet.GetRow(classjob).Abbreviation.ExtractText() + ":\n" + string.Join("\n", v.Select(entry => $"[{entry}]")));
+                    if (Plugin.SavedStacks.TryGetValue(classjob, out var value))
+                    {
+                        //TODO: union currently ignores new stacks of baseactions already configured with any stack and does not do a deeper union on the lists within the stack
+                        Plugin.PluginLog.Verbose("old: {old}", value);
+                        value.UnionWith(v);
+                        Plugin.PluginLog.Verbose("union: {union}", value);
+                    }
+                    else
+                    {
+                        Plugin.SavedStacks[classjob] = v;
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Plugin.PluginLog.Error(e, "Importing stacks failed.");
         }
     }
 }
